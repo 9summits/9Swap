@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "types": ["bun-types"],
+    "allowImportingTsExtensions": true,
+    // Vercel's node builder compiles api/**/*.ts (and the src/ files they
+    // reach) file-by-file with tsc honouring this tsconfig. Without this
+    // flag the emitted JS keeps the `.ts` import specifiers and every
+    // function crashes at load (ERR_MODULE_NOT_FOUND). Bun/tsc-noEmit
+    // locally are unaffected — the rewrite only applies on emit.
+    "rewriteRelativeImportExtensions": true,
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "api/**/*.ts", "scripts/**/*.ts", "shared/**/*.ts"]
+}

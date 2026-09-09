@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# Cross-compile the swap CLI for every Bun-supported target. Single
+# binary per (os, arch) lands in dist/swap-<os>-<arch>[.exe], plus a
+# convenience symlink dist/swap → the host's binary.
+#
+# Embeds .env (if present) and rebuilds the web/ singlefile bundle
+# once up front — both are platform-independent — so the per-target
+# loop only does the bun --compile step. Targets are built sequentially
+# rather than in parallel because Bun's compile step is CPU-heavy and
+# parallel processes thrash on a typical laptop; flip the loop to
+# `&` + `wait` if you have spare cores and don't mind the noise.
+#
+# For redistributable artifacts (install.sh / `swap update`):
+#   SWAP_PUBLIC_BUILD=1 ./build-all
+# skips embedding .env so private API keys never ship in the download.
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+if ! command -v bun >/dev/null 2>&1; then
+  echo "error: bun is required to build (https://bun.sh)" >&2
+  exit 1
+fi
+
+mkdir -p dist
+
+EMBEDDED_TS="src/env.embedded.ts"
+EMBEDDED_BACKUP="$(mktemp)"
+
+cleanup() {
+  cp "$EMBEDDED_BACKUP" "$EMBEDDED_TS"
+  rm -f "$EMBEDDED_BACKUP"
+}
+trap cleanup EXIT INT TERM
+
+cp "$EMBEDDED_TS" "$EMBEDDED_BACKUP"
+
+# Embed policy — see ./build. Public builds bake `.env.install` (not `.env`).
+if [ "${SWAP_PUBLIC_BUILD:-}" = "1" ]; then
+  if [ -f .env.install ]; then
+    echo "public build: embedding .env.install into all binaries..." >&2
+    bun scripts/embed-env.ts .env.install > "$EMBEDDED_TS"
+  else
+    echo "public build: no .env.install — binaries ship with empty EMBEDDED_ENV" >&2
+  fi
+elif [ -f .env ]; then
+  echo "embedding .env values into all binaries..." >&2
+  bun scripts/embed-env.ts .env > "$EMBEDDED_TS"
+fi
+
+if [ -d web ]; then
+  if [ ! -d web/node_modules ]; then
+    echo "installing web/ deps..." >&2
+    (cd web && bun install --silent)
+  fi
+  echo "building web/ singlefile bundle..." >&2
+  (cd web && bun run build > /dev/null 2>&1)
+fi
+
+# Bun --target slugs and the binary suffix we want for each.
+#   slug                  | output filename
+#   --------------------- | ------------------------
+#   bun-linux-x64         | swap-linux-x64
+#   bun-linux-arm64       | swap-linux-arm64
+#   bun-darwin-x64        | swap-darwin-x64
+#   bun-darwin-arm64      | swap-darwin-arm64
+#   bun-windows-x64       | swap-windows-x64.exe
+TARGETS=(
+  "bun-linux-x64:swap-linux-x64"
+  "bun-linux-arm64:swap-linux-arm64"
+  "bun-darwin-x64:swap-darwin-x64"
+  "bun-darwin-arm64:swap-darwin-arm64"
+  "bun-windows-x64:swap-windows-x64.exe"
+)
+
+for entry in "${TARGETS[@]}"; do
+  target="${entry%%:*}"
+  outfile="${entry##*:}"
+  echo "→ building dist/$outfile (target=$target)" >&2
+  bun build src/index.ts \
+    --compile \
+    --target="$target" \
+    --outfile "dist/$outfile"
+done
+
+# Convenience symlink so `./dist/swap` keeps working on the host.
+case "$(uname -sm)" in
+  "Darwin arm64")  host="swap-darwin-arm64" ;;
+  "Darwin x86_64") host="swap-darwin-x64" ;;
+  "Linux aarch64") host="swap-linux-arm64" ;;
+  "Linux x86_64")  host="swap-linux-x64" ;;
+  *) host="" ;;
+esac
+if [ -n "$host" ] && [ -f "dist/$host" ]; then
+  ln -sf "$host" dist/swap
+  echo "symlinked dist/swap → $host (host)" >&2
+fi
+
+echo
+echo "built:"
+ls -lh dist/swap-* | awk '{print "  " $9 "  " $5}'

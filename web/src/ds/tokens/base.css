@@ -1,0 +1,104 @@
+/* ===========================================================================
+   9SUMMITS — Base element defaults
+   Opinionated, low-level resets wired to the tokens. Dark-first.
+   =========================================================================== */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--weight-regular);
+  line-height: var(--leading-normal);
+  color: var(--text-primary);
+  background-color: var(--surface-page);
+}
+
+/* Headings default to display family */
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-snug);
+  color: var(--text-strong);
+}
+
+p { margin: 0; }
+
+a {
+  color: var(--text-link);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+a:hover { color: var(--brand-orange); }
+
+/* Tabular figures everywhere numbers matter */
+.tnum,
+table,
+input[type="number"] { font-feature-settings: var(--figures-tabular); }
+
+/* Mono helper */
+.mono { font-family: var(--font-mono); }
+
+/* Eyebrow / overline */
+.overline {
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+/* Gradient text utility */
+.text-gradient {
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+::selection {
+  background: var(--brand-soft-hover);
+  color: var(--text-strong);
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-brand);
+}
+
+/* DS Button focus: a crisp, DETACHED ring (outline + offset) instead of the
+   flush brand box-shadow. On the magenta gradient button the flush ring sits
+   directly against the already-magenta right edge and reads as a stray overlay
+   bleeding past the rounded corner; the offset gives a clear gap so it reads as
+   an intentional focus indicator. Higher specificity than the rule above, so the
+   box-shadow ring is suppressed; the hover glow (inline shadow-brand) still wins
+   over this when both apply. outline follows border-radius in modern Chrome. */
+.nine-btn:focus-visible {
+  outline: 2px solid var(--brand-pink);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+/* Custom scrollbar on dark */
+* { scrollbar-width: thin; scrollbar-color: var(--ink-600) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--ink-700);
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--ink-600); background-clip: padding-box; }

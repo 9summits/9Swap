@@ -1,0 +1,543 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "swap — DEX meta-aggregator API",
+    "version": "1.0.0",
+    "summary": "Stateless quote / route / build endpoints behind swap.9summits.io and the local `swap` server.",
+    "description": "Every endpoint is stateless: each call carries its full inputs, nothing is cached server-side, and `quoteId` is a client-side round key only. Amounts are **base units as decimal strings** (e.g. `\"1000000\"` for 1 USDC), never floats. Native gas token is the sentinel address `0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee`. The public host applies a per-IP token bucket per minute: `quote` bucket 60 (`/api/quote`, `/api/quote/stream`, `/api/route`), `build` bucket 12 (`/api/build`, `/assemble`), `submit` bucket 6 (`/submit`), `light` bucket 120 (everything else). Exceeding it returns HTTP 429 with a `Retry-After` header and body `{\"error\":\"rate limited, retry shortly\"}`. These calls consume the operator's venue API keys — cache responsibly and prefer the NDJSON stream for multi-venue races. Safety rules: never coerce `decimals` to 18; the ERC-20 approval target is `tx.spender`, not `tx.to`; use the same `slippageBps` for quote and build; never sign an order that was quoted with a placeholder sender.",
+    "license": { "name": "Apache-2.0", "url": "https://github.com/9summits/swap-cli/blob/main/LICENSE" },
+    "contact": { "name": "9summits", "email": "contact@9summits.io", "url": "https://swap.9summits.io/" },
+    "termsOfService": "https://swap.9summits.io/terms.html"
+  },
+  "security": [],
+  "externalDocs": {
+    "description": "CLI manual, llms.txt and agent skill",
+    "url": "https://swap.9summits.io/docs"
+  },
+  "servers": [
+    { "url": "https://swap.9summits.io", "description": "Public hosted instance (no session gate, rate limited per IP)" },
+    {
+      "url": "http://127.0.0.1:5151",
+      "description": "Local server started by `swap` with no arguments. Gated by `?id=<sid>` (printed at startup) unless the server runs with SWAP_NO_AUTH=1. Uses your own venue keys and RPC."
+    }
+  ],
+  "tags": [
+    { "name": "bootstrap", "description": "Capabilities, chains, venues, token lists" },
+    { "name": "quote", "description": "Multi-venue quotes, ranked best-first for the active side" },
+    { "name": "build", "description": "Executable payloads: tx, EIP-712 order, or Permit2 two-leg" },
+    { "name": "browser-flow", "description": "Endpoints used by the wallet page; rarely needed by agents" }
+  ],
+  "paths": {
+    "/api/mode": {
+      "get": {
+        "tags": ["bootstrap"],
+        "operationId": "getMode",
+        "summary": "Capabilities: chains, venues, buy-capable venues",
+        "description": "Call this first. `venues` is the set enabled on this deployment; `buyVenues` is the subset that supports exact-out (`amountOut`) natively.",
+        "responses": {
+          "200": { "description": "Mode", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Mode" } } } },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/api/tokens": {
+      "get": {
+        "tags": ["bootstrap"],
+        "operationId": "listTokens",
+        "summary": "Curated token list for a chain (native first)",
+        "parameters": [{ "$ref": "#/components/parameters/chain" }],
+        "responses": {
+          "200": {
+            "description": "Token list",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/TokenInfo" } } } }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "502": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/resolve-token": {
+      "post": {
+        "tags": ["bootstrap"],
+        "operationId": "resolveToken",
+        "summary": "Resolve a symbol or 0x address to full token metadata",
+        "description": "Use this for any token that is not in `/api/tokens`. Returns real on-chain `decimals`; never guess them.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["chain", "input"],
+                "properties": {
+                  "chain": { "$ref": "#/components/schemas/ChainAlias" },
+                  "input": { "type": "string", "description": "Symbol (case-insensitive) or 0x address", "examples": ["WBTC", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Resolved token", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TokenInfo" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/api/quote": {
+      "post": {
+        "tags": ["quote"],
+        "operationId": "quote",
+        "summary": "Race venues, return ranked quotes (one JSON object)",
+        "description": "Exactly one of `amountIn` (sell / exact-in) or `amountOut` (buy / exact-out) must be set. With `amountOut` only buy-capable venues participate natively. No wallet is needed. Ranking is by the variable leg (gross of gas); each route carries `gasUnits` / `gasPriceWei` so a client can re-rank net of gas.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/QuoteRequest" } } } },
+        "responses": {
+          "200": { "description": "Ranked quotes", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/QuoteResponse" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/api/quote/stream": {
+      "post": {
+        "tags": ["quote"],
+        "operationId": "quoteStream",
+        "summary": "Same as /api/quote, streamed as NDJSON while venues settle",
+        "description": "Preferred for multi-venue races. One JSON object per line: a `meta` line first, then one `route` or `verror` line per venue in settlement order (unsorted), then `done`. A `fatal` line means the whole round failed.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/QuoteRequest" } } } },
+        "responses": {
+          "200": {
+            "description": "NDJSON stream",
+            "content": { "application/x-ndjson": { "schema": { "$ref": "#/components/schemas/QuoteStreamEvent" } } }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/api/route": {
+      "post": {
+        "tags": ["quote"],
+        "operationId": "routeGraph",
+        "summary": "Re-quote one venue and return its symbol-labelled hops",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RouteRequest" } } } },
+        "responses": {
+          "200": { "description": "Route graph", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RouteGraphResponse" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/api/build": {
+      "post": {
+        "tags": ["build"],
+        "operationId": "build",
+        "summary": "Re-quote the chosen venue with the real sender and return an executable payload",
+        "description": "Quotes go stale within ~30 s, so the venue is re-quoted fresh. Send fully-resolved token metadata (from `/api/tokens` or `/api/resolve-token`). The result `kind` is `tx` (broadcast `tx`), `order` (sign `order.typedData`, POST to `order.submit`), or `permit-tx` (sign `permitTx.typedData`, then call `/assemble`). When `approval.needed` is true, broadcast `approval.approveTx` first. The approval target is `tx.spender` / `order.spender` / `permitTx.spender` — not necessarily `tx.to`.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BuildRequest" } } } },
+        "responses": {
+          "200": { "description": "Executable payload", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Payload" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/assemble": {
+      "post": {
+        "tags": ["build"],
+        "operationId": "assemblePermit",
+        "summary": "Permit2 second leg: turn a signed PermitSingle into the final tx",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["signature", "context"],
+                "properties": {
+                  "signature": { "type": "string", "description": "EIP-712 signature of `permitTx.typedData`" },
+                  "context": { "description": "The `assembleContext` returned by /api/build, echoed back verbatim" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Broadcastable tx", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SwapTx" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/submit": {
+      "post": {
+        "tags": ["build"],
+        "operationId": "submitOrder",
+        "summary": "Forward a signed intent order to a venue that needs an authenticated relayer (e.g. fusion)",
+        "description": "Only for orders whose `order.submit.url` points here. The relayer URL is rebuilt server-side from the whitelisted `venue` and integer `chainId`; the body is the order's `submit.bodyTemplate` completed with the signature.",
+        "parameters": [
+          { "name": "venue", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "chainId", "in": "query", "required": true, "schema": { "type": "integer" } },
+          { "name": "orderHash", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } },
+        "responses": {
+          "200": { "description": "Relayer response, passed through" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/simulate": {
+      "post": {
+        "tags": ["browser-flow"],
+        "operationId": "simulate",
+        "summary": "eth_simulateV1 dry-run (local server only; the public host returns kind=skipped)",
+        "responses": {
+          "200": { "description": "Simulation outcome", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SimulateOutcome" } } } },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/done": {
+      "post": {
+        "tags": ["browser-flow"],
+        "operationId": "reportDone",
+        "summary": "Report the outcome of a swap (anonymous aggregate counter; no address, no amount)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  { "type": "object", "required": ["kind", "hash", "venue", "chainId"], "properties": { "kind": { "const": "tx" }, "hash": { "type": "string" }, "venue": { "type": "string" }, "chainId": { "type": "integer" } } },
+                  { "type": "object", "required": ["kind", "orderId", "venue", "chainId"], "properties": { "kind": { "const": "order" }, "orderId": { "type": "string" }, "venue": { "type": "string" }, "chainId": { "type": "integer" } } },
+                  { "type": "object", "required": ["kind", "error", "venue", "chainId"], "properties": { "kind": { "const": "error" }, "error": { "type": "string" }, "venue": { "type": "string" }, "chainId": { "type": "integer" } } }
+                ]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Acknowledged" }, "400": { "description": "Body failed validation" } }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "chain": { "name": "chain", "in": "query", "required": false, "schema": { "$ref": "#/components/schemas/ChainAlias" }, "description": "Chain alias, default `eth`" }
+    },
+    "responses": {
+      "Error": { "description": "Error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "RateLimited": {
+        "description": "Per-IP bucket drained; retry after the number of seconds in `Retry-After`",
+        "headers": { "Retry-After": { "schema": { "type": "integer" } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    },
+    "schemas": {
+      "Error": { "type": "object", "required": ["error"], "properties": { "error": { "type": "string" } } },
+      "ChainAlias": {
+        "type": "string",
+        "enum": ["eth", "base", "arb", "op", "avax", "bsc", "hype", "unichain", "robinhood", "monad", "plasma", "polygon", "gnosis", "ink"],
+        "description": "eth=1, base=8453, arb=42161, op=10, avax=43114, bsc=56, hype=999, unichain=130, robinhood=4663, monad=143, plasma=9745, polygon=137, gnosis=100, ink=57073"
+      },
+      "Venue": {
+        "type": "string",
+        "enum": ["kyber", "velora", "matcha", "1inch", "curve", "uniswap", "openocean", "cow", "delta", "uniswapx", "fusion", "ophis"],
+        "description": "Sync (tx): kyber, velora, matcha, 1inch, curve, uniswap, openocean. Async / intent (EIP-712 order): cow, delta, uniswapx, fusion, ophis. odos / odosv2 are discontinued. The deployment's enabled subset is `GET /api/mode`."
+      },
+      "TradeSide": { "type": "string", "enum": ["sell", "buy"], "description": "sell = exact-in (amountIn fixed), buy = exact-out (amountOut fixed)" },
+      "Address": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
+      "BaseUnits": { "type": "string", "pattern": "^[0-9]+$", "description": "Integer amount in the token's base units, as a decimal string" },
+      "ChainMeta": {
+        "type": "object",
+        "required": ["alias", "chainId", "name", "explorer", "nativeSymbol", "wrappedNative"],
+        "properties": {
+          "alias": { "$ref": "#/components/schemas/ChainAlias" },
+          "chainId": { "type": "integer" },
+          "name": { "type": "string" },
+          "explorer": { "type": "string", "format": "uri" },
+          "nativeSymbol": { "type": "string" },
+          "wrappedNative": { "$ref": "#/components/schemas/Address" }
+        }
+      },
+      "VenueMeta": {
+        "type": "object",
+        "required": ["name", "kind"],
+        "properties": { "name": { "$ref": "#/components/schemas/Venue" }, "kind": { "type": "string", "enum": ["sync", "async"] } }
+      },
+      "Mode": {
+        "type": "object",
+        "required": ["interactive", "chains", "venues", "defaultChain"],
+        "properties": {
+          "interactive": { "type": "boolean", "const": true },
+          "sid": { "type": "string", "description": "Session id on the local server; empty on the public host" },
+          "chains": { "type": "array", "items": { "$ref": "#/components/schemas/ChainMeta" } },
+          "venues": { "type": "array", "items": { "$ref": "#/components/schemas/VenueMeta" } },
+          "buyVenues": { "type": "array", "items": { "$ref": "#/components/schemas/Venue" }, "description": "Venues with a native exact-out path" },
+          "defaultChain": { "$ref": "#/components/schemas/ChainAlias" },
+          "walletConnectProjectId": { "type": ["string", "null"] }
+        }
+      },
+      "TokenInfo": {
+        "type": "object",
+        "required": ["address", "symbol", "decimals"],
+        "properties": {
+          "address": { "$ref": "#/components/schemas/Address" },
+          "symbol": { "type": "string" },
+          "name": { "type": "string" },
+          "decimals": { "type": "integer", "minimum": 0, "maximum": 255 },
+          "logoURI": { "type": "string" }
+        }
+      },
+      "WireToken": {
+        "type": "object",
+        "required": ["address", "symbol", "decimals"],
+        "properties": {
+          "address": { "$ref": "#/components/schemas/Address" },
+          "symbol": { "type": "string" },
+          "decimals": { "type": "integer" },
+          "name": { "type": "string" }
+        }
+      },
+      "QuoteRequest": {
+        "type": "object",
+        "required": ["chain", "tokenInAddress", "tokenOutAddress", "slippageBps", "allowAsync"],
+        "properties": {
+          "chain": { "$ref": "#/components/schemas/ChainAlias" },
+          "tokenInAddress": { "$ref": "#/components/schemas/Address" },
+          "tokenOutAddress": { "$ref": "#/components/schemas/Address" },
+          "amountIn": { "$ref": "#/components/schemas/BaseUnits" },
+          "amountOut": { "$ref": "#/components/schemas/BaseUnits" },
+          "side": { "$ref": "#/components/schemas/TradeSide" },
+          "slippageBps": { "type": "integer", "minimum": 0, "maximum": 10000, "description": "10 = 0.1 %", "examples": [10] },
+          "allowAsync": { "type": "boolean", "description": "Include intent venues (result is an order to sign, not a tx)" },
+          "venues": { "type": "array", "items": { "$ref": "#/components/schemas/Venue" }, "description": "Subset to race; omit for every enabled venue" },
+          "disableOdosRfq": { "type": "boolean" }
+        },
+        "oneOf": [{ "required": ["amountIn"] }, { "required": ["amountOut"] }],
+        "examples": [
+          { "chain": "eth", "tokenInAddress": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "tokenOutAddress": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "amountIn": "1000000000", "slippageBps": 10, "allowAsync": false }
+        ]
+      },
+      "RouteQuote": {
+        "type": "object",
+        "required": ["venue", "amountIn", "amountOut", "kind"],
+        "properties": {
+          "venue": { "$ref": "#/components/schemas/Venue" },
+          "amountIn": { "$ref": "#/components/schemas/BaseUnits" },
+          "amountOut": { "$ref": "#/components/schemas/BaseUnits" },
+          "gasUsd": { "type": ["number", "null"] },
+          "priceImpactPct": { "type": ["number", "null"] },
+          "kind": { "type": "string", "enum": ["sync", "async"] },
+          "gasUnits": { "type": ["integer", "null"] },
+          "gasPriceWei": { "type": ["string", "null"] },
+          "amountInUsd": { "type": ["number", "null"] },
+          "amountOutUsd": { "type": ["number", "null"] },
+          "buyRefine": { "type": "boolean", "description": "Exact-out served by a sell-only venue via refine (build is exact-in with a min-out floor at the target)" },
+          "clientSide": { "type": "boolean" }
+        }
+      },
+      "QuoteResponse": {
+        "type": "object",
+        "required": ["quoteId", "side", "chain", "tokenIn", "tokenOut", "amountIn", "amountOut", "best", "routes", "rate", "expiresAt"],
+        "properties": {
+          "quoteId": { "type": "string" },
+          "side": { "$ref": "#/components/schemas/TradeSide" },
+          "chain": { "type": "object", "properties": { "alias": { "type": "string" }, "chainId": { "type": "integer" }, "name": { "type": "string" } } },
+          "tokenIn": { "$ref": "#/components/schemas/WireToken" },
+          "tokenOut": { "$ref": "#/components/schemas/WireToken" },
+          "amountIn": { "$ref": "#/components/schemas/BaseUnits" },
+          "amountOut": { "$ref": "#/components/schemas/BaseUnits" },
+          "best": { "type": "object", "properties": { "venue": { "$ref": "#/components/schemas/Venue" }, "amountIn": { "type": "string" }, "amountOut": { "type": "string" } } },
+          "routes": { "type": "array", "items": { "$ref": "#/components/schemas/RouteQuote" }, "description": "Best first for the active side" },
+          "unavailable": { "type": "array", "items": { "type": "object", "properties": { "venue": { "type": "string" }, "reason": { "type": "string" } } } },
+          "tokenInUsd": { "type": ["number", "null"] },
+          "tokenOutUsd": { "type": ["number", "null"] },
+          "rate": { "type": "string", "description": "Human-units tokenOut per tokenIn of the best route" },
+          "expiresAt": { "type": "integer", "description": "Unix ms; re-quote after this" }
+        }
+      },
+      "QuoteStreamEvent": {
+        "oneOf": [
+          { "type": "object", "required": ["type", "quoteId", "side", "chain", "tokenIn", "tokenOut", "expiresAt"], "properties": { "type": { "const": "meta" }, "quoteId": { "type": "string" }, "side": { "$ref": "#/components/schemas/TradeSide" }, "chain": { "type": "object" }, "tokenIn": { "$ref": "#/components/schemas/WireToken" }, "tokenOut": { "$ref": "#/components/schemas/WireToken" }, "amountIn": { "type": "string" }, "amountOut": { "type": "string" }, "expiresAt": { "type": "integer" } } },
+          { "type": "object", "required": ["type", "route"], "properties": { "type": { "const": "route" }, "route": { "$ref": "#/components/schemas/RouteQuote" } } },
+          { "type": "object", "required": ["type", "venue", "error"], "properties": { "type": { "const": "verror" }, "venue": { "type": "string" }, "error": { "type": "string" } } },
+          { "type": "object", "required": ["type", "expiresAt"], "properties": { "type": { "const": "done" }, "expiresAt": { "type": "integer" } } },
+          { "type": "object", "required": ["type", "error"], "properties": { "type": { "const": "fatal" }, "error": { "type": "string" } } }
+        ]
+      },
+      "RouteRequest": {
+        "type": "object",
+        "required": ["chain", "venue", "tokenIn", "tokenOut"],
+        "properties": {
+          "chain": { "$ref": "#/components/schemas/ChainAlias" },
+          "venue": { "$ref": "#/components/schemas/Venue" },
+          "amountIn": { "$ref": "#/components/schemas/BaseUnits" },
+          "amountOut": { "$ref": "#/components/schemas/BaseUnits" },
+          "side": { "$ref": "#/components/schemas/TradeSide" },
+          "slippageBps": { "type": "integer" },
+          "tokenIn": { "$ref": "#/components/schemas/WireToken" },
+          "tokenOut": { "$ref": "#/components/schemas/WireToken" },
+          "disableOdosRfq": { "type": "boolean" }
+        }
+      },
+      "RouteHop": {
+        "type": "object",
+        "required": ["from", "to", "exchange", "swapAmount", "fromName", "fromDecimals", "toDecimals"],
+        "properties": {
+          "from": { "type": "string", "description": "tokenIn symbol of the hop" },
+          "to": { "type": "string" },
+          "exchange": { "type": "string", "description": "Protocol / pool label" },
+          "swapAmount": { "type": "string", "description": "Base units routed through the hop" },
+          "approxAmount": { "type": "boolean" },
+          "amountOut": { "type": "string" },
+          "fromName": { "type": "string" },
+          "fromDecimals": { "type": "integer" },
+          "toDecimals": { "type": "integer" }
+        }
+      },
+      "RouteGraphResponse": {
+        "type": "object",
+        "required": ["venue", "tokenIn", "tokenOut", "hops"],
+        "properties": {
+          "venue": { "$ref": "#/components/schemas/Venue" },
+          "tokenIn": { "type": "string" },
+          "tokenOut": { "type": "string" },
+          "hops": { "type": "array", "items": { "$ref": "#/components/schemas/RouteHop" }, "description": "Empty for intent venues (settled by a solver, no on-chain route)" }
+        }
+      },
+      "BuildRequest": {
+        "type": "object",
+        "required": ["venue", "sender", "chain", "tokenIn", "tokenOut"],
+        "properties": {
+          "venue": { "$ref": "#/components/schemas/Venue" },
+          "sender": { "$ref": "#/components/schemas/Address" },
+          "recipient": { "oneOf": [{ "$ref": "#/components/schemas/Address" }, { "type": "null" }], "description": "Only for plain sends; swaps always pay out to `sender`" },
+          "slippageBps": { "type": "integer", "description": "Use the same value you quoted with. Default 10." },
+          "chain": { "$ref": "#/components/schemas/ChainAlias" },
+          "tokenIn": { "$ref": "#/components/schemas/WireToken" },
+          "tokenOut": { "$ref": "#/components/schemas/WireToken" },
+          "amountIn": { "$ref": "#/components/schemas/BaseUnits" },
+          "amountOut": { "$ref": "#/components/schemas/BaseUnits" },
+          "side": { "$ref": "#/components/schemas/TradeSide" },
+          "odosNotCompact": { "type": "boolean" },
+          "disableOdosRfq": { "type": "boolean" }
+        },
+        "oneOf": [{ "required": ["amountIn"] }, { "required": ["amountOut"] }]
+      },
+      "SwapTx": {
+        "type": "object",
+        "required": ["to", "from", "data", "value", "spender", "chainId"],
+        "properties": {
+          "to": { "$ref": "#/components/schemas/Address" },
+          "from": { "$ref": "#/components/schemas/Address" },
+          "data": { "type": "string", "description": "0x-prefixed calldata" },
+          "value": { "type": "string", "description": "Wei, decimal string" },
+          "gas": { "type": ["string", "null"] },
+          "gasPrice": { "type": ["string", "null"] },
+          "maxPriorityFeePerGas": { "type": ["string", "null"] },
+          "spender": { "$ref": "#/components/schemas/Address" },
+          "chainId": { "type": "integer" }
+        }
+      },
+      "Eip712TypedData": {
+        "type": "object",
+        "required": ["domain", "types", "primaryType", "message"],
+        "properties": {
+          "domain": { "type": "object", "additionalProperties": true },
+          "types": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "type": { "type": "string" } } } } },
+          "primaryType": { "type": "string" },
+          "message": { "type": "object", "additionalProperties": true }
+        }
+      },
+      "SwapOrder": {
+        "type": "object",
+        "required": ["venue", "spender", "signer", "typedData", "submit", "validUntilSec", "chainId"],
+        "properties": {
+          "venue": { "$ref": "#/components/schemas/Venue" },
+          "spender": { "$ref": "#/components/schemas/Address" },
+          "signer": { "$ref": "#/components/schemas/Address" },
+          "typedData": { "$ref": "#/components/schemas/Eip712TypedData" },
+          "submit": {
+            "type": "object",
+            "required": ["url", "method", "bodyTemplate"],
+            "properties": {
+              "url": { "type": "string", "format": "uri", "description": "Where to POST the signed order (venue relayer, or this host's /submit for authed venues)" },
+              "method": { "const": "POST" },
+              "bodyTemplate": { "type": "object", "additionalProperties": true, "description": "Body to send, with the signature field filled in" }
+            }
+          },
+          "validUntilSec": { "type": "integer" },
+          "decayStartSec": { "type": ["integer", "null"] },
+          "chainId": { "type": "integer" }
+        }
+      },
+      "SwapPermitTx": {
+        "type": "object",
+        "required": ["venue", "spender", "signer", "typedData", "chainId"],
+        "properties": {
+          "venue": { "$ref": "#/components/schemas/Venue" },
+          "spender": { "$ref": "#/components/schemas/Address" },
+          "signer": { "$ref": "#/components/schemas/Address" },
+          "typedData": { "$ref": "#/components/schemas/Eip712TypedData" },
+          "chainId": { "type": "integer" }
+        }
+      },
+      "ApprovalInfo": {
+        "type": "object",
+        "required": ["needed", "current", "required"],
+        "properties": {
+          "needed": { "type": "boolean" },
+          "current": { "type": "string", "description": "Current allowance, base units" },
+          "required": { "type": "string" },
+          "approveTx": { "oneOf": [{ "$ref": "#/components/schemas/SwapTx" }, { "type": "null" }], "description": "Broadcast this first when `needed` is true" }
+        }
+      },
+      "Payload": {
+        "type": "object",
+        "required": ["kind", "venue", "chain", "tokenIn", "tokenOut", "amountIn", "amountOut", "sender", "slippageBps", "tx", "order", "permitTx"],
+        "properties": {
+          "kind": { "type": "string", "enum": ["tx", "order", "permit-tx"] },
+          "venue": { "$ref": "#/components/schemas/Venue" },
+          "chain": { "type": "object", "properties": { "chainId": { "type": "integer" }, "name": { "type": "string" }, "explorer": { "type": "string" }, "nativeSymbol": { "type": "string" } } },
+          "tokenIn": { "$ref": "#/components/schemas/WireToken" },
+          "tokenOut": { "$ref": "#/components/schemas/WireToken" },
+          "amountIn": { "$ref": "#/components/schemas/BaseUnits" },
+          "amountOut": { "$ref": "#/components/schemas/BaseUnits" },
+          "sender": { "$ref": "#/components/schemas/Address" },
+          "recipient": { "type": ["string", "null"] },
+          "slippageBps": { "type": "integer" },
+          "approval": { "oneOf": [{ "$ref": "#/components/schemas/ApprovalInfo" }, { "type": "null" }] },
+          "simulateEnabled": { "type": "boolean" },
+          "tx": { "oneOf": [{ "$ref": "#/components/schemas/SwapTx" }, { "type": "null" }], "description": "Set when kind = tx" },
+          "order": { "oneOf": [{ "$ref": "#/components/schemas/SwapOrder" }, { "type": "null" }], "description": "Set when kind = order" },
+          "permitTx": { "oneOf": [{ "$ref": "#/components/schemas/SwapPermitTx" }, { "type": "null" }], "description": "Set when kind = permit-tx" },
+          "assembleContext": { "description": "Opaque; echo back to /assemble for kind = permit-tx" },
+          "walletConnectProjectId": { "type": ["string", "null"] }
+        }
+      },
+      "SimulateOutcome": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["kind", "swapStatus", "tokenOutReceived"],
+            "properties": {
+              "kind": { "const": "ok" },
+              "approveStatus": { "type": "string", "enum": ["ok", "reverted", "skipped"] },
+              "approveGasUsed": { "type": ["string", "null"] },
+              "swapStatus": { "type": "string", "enum": ["ok", "reverted"] },
+              "swapGasUsed": { "type": ["string", "null"] },
+              "swapRevertReason": { "type": ["string", "null"] },
+              "tokenOutReceived": { "type": "string" },
+              "tokenInPriceUsd": { "type": ["number", "null"] },
+              "tokenOutPriceUsd": { "type": ["number", "null"] }
+            }
+          },
+          { "type": "object", "required": ["kind", "reason"], "properties": { "kind": { "const": "skipped" }, "reason": { "type": "string" } } },
+          { "type": "object", "required": ["kind", "message"], "properties": { "kind": { "const": "error" }, "message": { "type": "string" } } }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,1459 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>CLI Manual — swap</title>
+    <meta
+      name="description"
+      content="Manual for the swap CLI: install, quote every DEX aggregator from the terminal, build calldata, simulate, sign in the browser, wrap, send, exact-out, JSON and piping — with examples."
+    />
+    <link rel="canonical" href="https://swap.9summits.io/docs" />
+    <link rel="alternate" type="text/markdown" href="/docs.md" title="This manual as Markdown" />
+    <link rel="alternate" type="application/json" href="/openapi.json" title="OpenAPI" />
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgc2hhcGUtcmVuZGVyaW5nPSJnZW9tZXRyaWNQcmVjaXNpb24iPgogIDxkZWZzPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJ3YXJtIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMCI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI0ZFOTY1NSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iI0U5MDA5MSIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICA8L2RlZnM+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMwZDExMTciLz4KICA8cGF0aCBkPSJNMTIgMTUgTDI5IDMyIEwxMiA0OSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjM2ZiOTUwIiBzdHJva2Utd2lkdGg9IjkiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogIDxyZWN0IHg9IjM2IiB5PSI0MCIgd2lkdGg9IjE3IiBoZWlnaHQ9IjExIiByeD0iMiIgZmlsbD0idXJsKCN3YXJtKSIvPgo8L3N2Zz4K"
+    />
+    <style>
+      :root {
+        /* 9summits dark palette (mirrors web/src/ds/tokens/colors.css) */
+        --surface-page: #0a0810;
+        --surface-card: #16131f;
+        --surface-code: #0f0d16;
+        --border-subtle: rgba(255, 255, 255, 0.06);
+        --border-default: rgba(255, 255, 255, 0.1);
+        --text-strong: #ffffff;
+        --text-primary: #ece9f3;
+        --text-secondary: #a59fb8;
+        --text-tertiary: #6f6982;
+        --text-link: #ff5ca8;
+        --brand-solid: #ff008c;
+        --warning: #ffb454;
+        --info: #7cc4ff;
+        --terminal-green: #3fb950;
+        --gradient-brand: linear-gradient(
+          90deg,
+          #ff9655 0%,
+          #fe4d7a 45%,
+          #ff008c 100%
+        );
+        --font-sans: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+        --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas,
+          monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--surface-page);
+        color: var(--text-primary);
+        font-family: var(--font-sans);
+        font-size: 16px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+
+      .page {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 28px 24px 72px;
+      }
+
+      /* ---------------- top bar ---------------- */
+      .topbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 10px;
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--border-subtle);
+        font-family: var(--font-mono);
+        font-size: 13px;
+      }
+      .topbar a {
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-weight: 500;
+        border-bottom: none;
+      }
+      .topbar a:hover {
+        color: var(--text-primary);
+      }
+      .prompt {
+        color: var(--terminal-green);
+        font-weight: 700;
+      }
+      .crumb {
+        color: var(--text-tertiary);
+      }
+
+      /* ---------------- headings ---------------- */
+      h1 {
+        margin: 36px 0 10px;
+        font-size: 30px;
+        line-height: 1.18;
+        letter-spacing: -0.02em;
+        font-weight: 700;
+        color: var(--text-strong);
+      }
+      .rule {
+        width: 72px;
+        height: 3px;
+        border-radius: 2px;
+        background: var(--gradient-brand);
+        margin: 0 0 18px;
+      }
+      .meta {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-tertiary);
+        margin: 0 0 28px;
+        letter-spacing: 0.02em;
+      }
+      h2 {
+        margin: 44px 0 12px;
+        font-size: 20px;
+        line-height: 1.25;
+        letter-spacing: -0.01em;
+        font-weight: 700;
+        color: var(--text-strong);
+        scroll-margin-top: 24px;
+      }
+      h2 .num {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--brand-solid);
+        margin-right: 10px;
+        vertical-align: 1px;
+      }
+      h3 {
+        margin: 26px 0 8px;
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+
+      /* ---------------- text ---------------- */
+      p,
+      li {
+        color: var(--text-secondary);
+      }
+      p {
+        margin: 0 0 14px;
+      }
+      ul {
+        margin: 0 0 14px;
+        padding-left: 20px;
+      }
+      li {
+        margin-bottom: 8px;
+      }
+      li::marker {
+        color: var(--text-tertiary);
+      }
+      strong {
+        color: var(--text-primary);
+        font-weight: 700;
+      }
+      a {
+        color: var(--text-link);
+        text-decoration: none;
+        border-bottom: 1px solid rgba(255, 92, 168, 0.35);
+      }
+      a:hover {
+        border-bottom-color: var(--text-link);
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        color: var(--text-primary);
+      }
+      p code,
+      li code,
+      td code {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border-subtle);
+        border-radius: 4px;
+        padding: 1px 5px;
+        font-size: 0.85em;
+        white-space: nowrap;
+      }
+
+      /* ---------------- table of contents ---------------- */
+      .toc {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 6px 18px;
+        margin: 0 0 8px;
+        padding: 16px 18px;
+        background: var(--surface-card);
+        border: 1px solid var(--border-default);
+        border-radius: 8px;
+        font-family: var(--font-mono);
+        font-size: 13px;
+      }
+      .toc a {
+        color: var(--text-secondary);
+        border-bottom: none;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .toc a:hover {
+        color: var(--text-primary);
+      }
+      .toc .num {
+        color: var(--brand-solid);
+        margin-right: 8px;
+      }
+
+      /* ---------------- terminal block ---------------- */
+      pre {
+        position: relative;
+        margin: 0 0 18px;
+        padding: 14px 16px;
+        background: var(--surface-code);
+        border: 1px solid var(--border-default);
+        border-radius: 8px;
+        font-family: var(--font-mono);
+        font-size: 13px;
+        line-height: 1.65;
+        color: var(--text-primary);
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      pre code {
+        font-size: inherit;
+        color: inherit;
+        background: none;
+        border: none;
+        padding: 0;
+        white-space: pre;
+      }
+      pre .c {
+        color: var(--text-tertiary);
+      }
+      pre .p {
+        color: var(--terminal-green);
+        user-select: none;
+      }
+      pre .f {
+        color: var(--info);
+      }
+      pre .o {
+        color: var(--text-secondary);
+      }
+      pre .k {
+        color: var(--warning);
+      }
+      pre .b {
+        color: var(--text-strong);
+        font-weight: 700;
+      }
+      pre .star {
+        color: var(--warning);
+      }
+      .copy {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        border: 1px solid var(--border-default);
+        background: var(--surface-card);
+        color: var(--text-tertiary);
+        border-radius: 6px;
+        padding: 3px 8px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.12s ease, color 0.12s ease;
+      }
+      pre:hover .copy,
+      .copy:focus-visible {
+        opacity: 1;
+      }
+      .copy:hover {
+        color: var(--text-primary);
+      }
+      .copy.ok {
+        color: var(--terminal-green);
+        border-color: rgba(63, 185, 80, 0.4);
+        opacity: 1;
+      }
+
+      /* ---------------- tables ---------------- */
+      .tablewrap {
+        overflow-x: auto;
+        margin: 0 0 18px;
+        border: 1px solid var(--border-default);
+        border-radius: 8px;
+        background: var(--surface-card);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13.5px;
+      }
+      th,
+      td {
+        text-align: left;
+        vertical-align: top;
+        padding: 9px 14px;
+        border-bottom: 1px solid var(--border-subtle);
+      }
+      th {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-tertiary);
+        background: rgba(255, 255, 255, 0.02);
+      }
+      tr:last-child td {
+        border-bottom: none;
+      }
+      td {
+        color: var(--text-secondary);
+      }
+      td:first-child {
+        white-space: nowrap;
+      }
+      td code {
+        white-space: nowrap;
+      }
+      .tag {
+        display: inline-block;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        padding: 1px 7px;
+        border-radius: 999px;
+        border: 1px solid var(--border-default);
+        color: var(--text-secondary);
+        white-space: nowrap;
+      }
+      .tag.sync {
+        color: var(--terminal-green);
+        border-color: rgba(63, 185, 80, 0.35);
+      }
+      .tag.async {
+        color: var(--info);
+        border-color: rgba(124, 196, 255, 0.35);
+      }
+      .tag.off {
+        color: var(--text-tertiary);
+        text-decoration: line-through;
+      }
+      .tag.buy {
+        color: var(--warning);
+        border-color: rgba(255, 180, 84, 0.35);
+      }
+
+      /* ---------------- availability matrix ---------------- */
+      .matrixwrap {
+        background: var(--surface-code);
+      }
+      .matrix {
+        font-size: 13px;
+        table-layout: auto;
+      }
+      .matrix th,
+      .matrix td {
+        text-align: center;
+        padding: 8px 6px;
+        white-space: nowrap;
+      }
+      .matrix th:first-child,
+      .matrix td:first-child {
+        text-align: left;
+        padding-left: 14px;
+        padding-right: 14px;
+        position: sticky;
+        left: 0;
+        background: var(--surface-code);
+        box-shadow: 1px 0 0 var(--border-subtle);
+        z-index: 1;
+      }
+      .matrix th .ch {
+        display: inline-block;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-transform: none;
+        color: var(--text-secondary);
+      }
+      .matrix td.y {
+        color: var(--terminal-green);
+        font-weight: 700;
+      }
+      .matrix td.n {
+        color: var(--text-tertiary);
+        opacity: 0.55;
+      }
+      .matrix tbody tr:hover td {
+        background: rgba(255, 255, 255, 0.025);
+      }
+      .matrix tbody tr:hover td:first-child {
+        background: #14121b;
+      }
+      .matrix tfoot td {
+        border-top: 1px solid var(--border-default);
+        border-bottom: none;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-tertiary);
+      }
+      .matrix tfoot td.cnt {
+        color: var(--text-secondary);
+      }
+      .matrix td .tag {
+        margin-left: 6px;
+        font-size: 10px;
+        padding: 0 6px;
+      }
+      .matrixlegend {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-tertiary);
+        margin-top: -6px;
+      }
+      .matrixlegend .y {
+        color: var(--terminal-green);
+        font-weight: 700;
+      }
+
+      /* ---------------- cards ---------------- */
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 12px;
+        margin: 0 0 18px;
+      }
+      .card {
+        background: var(--surface-card);
+        border: 1px solid var(--border-default);
+        border-radius: 8px;
+        padding: 14px 16px;
+      }
+      .card .t {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-strong);
+        margin-bottom: 6px;
+      }
+      .card p {
+        margin: 0;
+        font-size: 13.5px;
+      }
+
+      /* ---------------- callout ---------------- */
+      .callout {
+        background: var(--surface-card);
+        border: 1px solid var(--border-default);
+        border-left: 3px solid var(--warning);
+        border-radius: 8px;
+        padding: 16px 18px;
+        margin: 0 0 24px;
+      }
+      .callout.info {
+        border-left-color: var(--info);
+      }
+      .callout p:last-child,
+      .callout ul:last-child {
+        margin-bottom: 0;
+      }
+      .callout .label {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--warning);
+        margin-bottom: 8px;
+      }
+      .callout.info .label {
+        color: var(--info);
+      }
+
+      /* ---------------- footer ---------------- */
+      .foot {
+        margin-top: 48px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border-subtle);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-tertiary);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 14px;
+        align-items: baseline;
+      }
+      .foot a {
+        color: var(--text-secondary);
+        border-bottom: none;
+      }
+      .foot a:hover {
+        color: var(--text-primary);
+      }
+
+      @media (max-width: 520px) {
+        .page {
+          padding: 20px 16px 56px;
+        }
+        h1 {
+          font-size: 25px;
+        }
+        h2 {
+          font-size: 18px;
+        }
+        pre {
+          font-size: 12px;
+          padding: 12px 12px;
+        }
+        .copy {
+          opacity: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <nav class="topbar">
+        <a href="/"><span class="prompt">&gt;</span> swap</a>
+        <span class="crumb">/ docs</span>
+      </nav>
+
+      <h1>swap — CLI manual</h1>
+      <div class="rule"></div>
+      <p class="meta">
+        Everything in <code>swap --help</code>, with examples · Operator:
+        9summits
+      </p>
+
+      <p>
+        <strong>swap</strong> is a terminal CLI that asks every major DEX
+        aggregator (KyberSwap, Velora, 0x/Matcha, 1inch, Curve, Uniswap,
+        OpenOcean, plus intent venues like CoW, UniswapX, Velora Delta and 1inch
+        Fusion) for a swap quote on EVM chains, ranks the answers by token-out
+        received, and — optionally — builds the executable calldata, checks your
+        allowance, simulates the trade against your pranked balance, and hands
+        the transaction to your wallet in the browser. Single Bun-compiled
+        binary, no daemon, no telemetry.
+      </p>
+
+      <pre><button class="copy" type="button">copy</button><code><span class="p">$</span> swap 1 WBTC ETH                       <span class="c"># best quote across every venue</span>
+<span class="p">$</span> swap 1000 USDC USDT <span class="f">-v</span> all           <span class="c"># side-by-side comparison block</span>
+<span class="p">$</span> swap 100 USDC USDT <span class="f">--from</span> 0xYou <span class="f">--simulate</span>   <span class="c"># dry-run, real tokenOut</span>
+<span class="p">$</span> swap 0.1 WETH USDC <span class="f">--from</span> 0xYou <span class="f">--browser</span>    <span class="c"># sign &amp; send in your wallet</span>
+<span class="p">$</span> swap                                  <span class="c"># no args: open the local dApp</span></code></pre>
+
+      <nav class="toc" aria-label="Sections">
+        <a href="#install"><span class="num">01</span>Install &amp; setup</a>
+        <a href="#usage"><span class="num">02</span>Usage &amp; flags</a>
+        <a href="#quote"><span class="num">03</span>Quoting</a>
+        <a href="#build"><span class="num">04</span>Build &amp; simulate</a>
+        <a href="#browser"><span class="num">05</span>Browser signing</a>
+        <a href="#exact-out"><span class="num">06</span>Exact-out</a>
+        <a href="#actions"><span class="num">07</span>Wrap, send, actions</a>
+        <a href="#venues"><span class="num">08</span>Venues &amp; chains</a>
+        <a href="#config"><span class="num">09</span>RPC, keys, config</a>
+        <a href="#output"><span class="num">10</span>Output &amp; scripting</a>
+        <a href="#agents"><span class="num">11</span>Unattended &amp; agents</a>
+      </nav>
+
+      <!-- ============================================================ -->
+      <h2 id="install"><span class="num">01</span>Install &amp; setup</h2>
+
+      <p>
+        One command downloads a prebuilt binary for macOS (arm64, x64) or Linux
+        (arm64, x64) into <code>~/.local/bin</code>. Re-run it to upgrade, or use
+        <code>swap update</code> from then on.
+      </p>
+
+      <pre><button class="copy" type="button">copy</button><code><span class="p">$</span> curl -fsSL https://swap.9summits.io/install.sh | bash</code></pre>
+
+      <div class="grid">
+        <div class="card">
+          <span class="t">From source</span>
+          <p>
+            Needs <a href="https://bun.sh">Bun</a>. Clone
+            <a href="https://github.com/9summits/swap-cli">9summits/swap-cli</a>,
+            <code>bun install</code>, then <code>./build</code> →
+            <code>dist/swap</code>.
+          </p>
+        </div>
+        <div class="card">
+          <span class="t">Self-update</span>
+          <p>
+            <code>swap update</code> checks the published checksum and replaces
+            the binary in place only when a newer build exists.
+          </p>
+        </div>
+      </div>
+
+      <p>
+        Installer env: <code>SWAP_INSTALL_DIR</code> (default
+        <code>~/.local/bin</code>), <code>SWAP_INSTALL_BASE</code> (asset
+        base), <code>SWAP_NO_PROGRESS=1</code>.
+      </p>
+
+      <h3>First run</h3>
+      <p>
+        Quotes work out of the box. Building a transaction, simulating, or
+        swapping <code>max</code> needs an RPC. The first time one is required,
+        the CLI prompts for an Alchemy key or an RPC URL and saves it under
+        <code>~/.swap/config</code>. You can trigger that prompt any time:
+      </p>
+
+      <pre><button class="copy" type="button">copy</button><code><span class="p">$</span> swap <span class="f">--init</span>      <span class="c"># prompt for ALCHEMY_API_KEY or RPC URL, write ~/.swap/config</span>
+<span class="p">$</span> swap update      <span class="c"># pull the latest public prebuilt (no-op when current)</span>
+<span class="p">$</span> swap <span class="f">--help</span></code></pre>
+
+      <!-- ============================================================ -->
+      <h2 id="usage"><span class="num">02</span>Usage &amp; flags</h2>
+
+      <pre><code><span class="p">$</span> swap <span class="o">[options]</span> <span class="b">&lt;amount&gt; &lt;tokenIn&gt; [tokenOut]</span></code></pre>
+
+      <ul>
+        <li>
+          <strong><code>amount</code></strong> is in human units
+          (<code>1.5</code>, <code>0.001</code>). <code>max</code> swaps the
+          sender's entire balance (needs <code>--from</code> + RPC). By default it
+          is the amount of <strong>tokenIn</strong>; with
+          <code>--exact-out</code> it becomes the amount of
+          <strong>tokenOut</strong> you want to receive.
+        </li>
+        <li>
+          <strong><code>tokenIn</code> / <code>tokenOut</code></strong> accept a
+          symbol (<code>WBTC</code>, case-insensitive) or a <code>0x</code>
+          address. Unknown symbols are resolved through KyberSwap, then
+          CoinGecko, then on-chain <code>decimals()</code>. Native gas token is
+          <code>ETH</code>, <code>BNB</code>, <code>AVAX</code>,
+          <code>HYPE</code>, <code>MON</code>, <code>XPL</code>,
+          <code>POL</code>, <code>XDAI</code> depending on the chain.
+        </li>
+        <li>
+          <strong><code>tokenOut</code></strong> is optional only with
+          <code>-a send</code>.
+        </li>
+      </ul>
+
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Flag</th>
+              <th>Effect</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>-v, --venue &lt;list&gt;</code></td>
+              <td>
+                Venue(s) to query. One name, a comma-separated list
+                (<code>kyber,matcha,1inch</code>), or <code>all</code>
+                (default). <code>--all</code> is an alias for
+                <code>-v all</code>.
+              </td>
+            </tr>
+            <tr>
+              <td><code>-c, --chain &lt;alias&gt;</code></td>
+              <td>
+                <code>eth</code> (default), <code>base</code>,
+                <code>arb</code>, <code>op</code>, <code>avax</code>,
+                <code>bsc</code>, <code>hype</code>, <code>unichain</code>,
+                <code>robinhood</code>, <code>monad</code>, <code>plasma</code>,
+                <code>polygon</code>, <code>gnosis</code>, <code>ink</code>.
+              </td>
+            </tr>
+            <tr>
+              <td><code>--slippage &lt;pct&gt;</code></td>
+              <td>
+                Tolerance in percent — <code>0.5</code> = 50 bps. Default
+                <code>0.1</code>. The same value drives the quote and the build.
+              </td>
+            </tr>
+            <tr>
+              <td><code>--from &lt;addr|alias&gt;</code></td>
+              <td>
+                Sender and recipient of the swap. Required for <code>-d</code>,
+                <code>--simulate</code>, <code>--browser</code> and
+                <code>max</code>. Also read from <code>$SENDER_ADDRESS</code>.
+                Accepts a wallet alias (see <a href="#actions">actions</a>).
+              </td>
+            </tr>
+            <tr>
+              <td><code>-d, --data</code></td>
+              <td>
+                Also build the tx: target, calldata, value, gas params,
+                allowance check and an approve tx when needed.
+              </td>
+            </tr>
+            <tr>
+              <td><code>--simulate</code> / <code>--simu</code></td>
+              <td>
+                Run approve + swap through <code>eth_simulateV1</code> with a
+                pranked tokenIn balance; reports the tokenOut actually received
+                and any revert reason. Sync venues only.
+              </td>
+            </tr>
+            <tr>
+              <td><code>--browser</code></td>
+              <td>
+                Open a local RainbowKit page to connect a wallet and sign /
+                send. Covers sync txs, intent orders and Uniswap Permit2 flows.
+                Exclusive with <code>--json</code> / <code>-s</code>.
+              </td>
+            </tr>
+            <tr>
+              <td><code>--allow-async</code></td>
+              <td>
+                Include intent venues (<code>cow</code>, <code>delta</code>,
+                <code>uniswapx</code>, <code>fusion</code>, <code>ophis</code>).
+                Output is an EIP-712 order to sign and POST, not a tx.
+              </td>
+            </tr>
+            <tr>
+              <td><code>--exact-out</code></td>
+              <td>
+                <code>amount</code> is the tokenOut to receive; the CLI
+                minimises tokenIn paid. Not allowed with send / wrap / special
+                actions.
+              </td>
+            </tr>
+            <tr>
+              <td><code>-a, --action &lt;name&gt;</code></td>
+              <td>
+                <code>swap</code> (default), <code>send</code>,
+                <code>addwallet</code>, plus protocol helpers listed in
+                <a href="#actions">07</a>.
+              </td>
+            </tr>
+            <tr>
+              <td><code>--to &lt;addr|alias&gt;</code></td>
+              <td>Recipient for <code>-a send</code>.</td>
+            </tr>
+            <tr>
+              <td><code>--rpc &lt;url&gt;</code></td>
+              <td>
+                Override the RPC for this run — beats every env var. Handy for a
+                local fork.
+              </td>
+            </tr>
+            <tr>
+              <td><code>--json</code></td>
+              <td>Structured machine-readable output, one object.</td>
+            </tr>
+            <tr>
+              <td><code>-s, --simple</code></td>
+              <td>
+                Print only the number: <code>amountOut</code>, or
+                <code>amountIn</code> under <code>--exact-out</code>.
+              </td>
+            </tr>
+            <tr>
+              <td><code>--nofee</code></td>
+              <td>
+                Zero the partner fee (<code>REFERRAL_FEE_BPS</code>) for this
+                run on every venue.
+              </td>
+            </tr>
+            <tr>
+              <td><code>--debug</code></td>
+              <td>
+                With <code>--simulate</code>: also list ERC20 transfers landing
+                at <code>REFERRAL_ADDRESS</code>.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ============================================================ -->
+      <h2 id="quote"><span class="num">03</span>Quoting</h2>
+
+      <p>
+        The default action races every venue in parallel and prints the winner:
+        route tree, rate, gas, chain, venue, router and token rows, then a bold
+        summary line. With <code>-v all</code> a <strong>venues</strong>
+        comparison block streams below, sorted by <code>amountOut</code> with
+        <span class="star">★</span> on the current leader. When CoinGecko prices
+        both legs, ranking is net of gas.
+      </p>
+
+      <pre><button class="copy" type="button">copy</button><code><span class="c"># best quote, all venues (default)</span>
+<span class="p">$</span> swap 1 WBTC ETH
+
+<span class="c"># pin one venue, or race a subset</span>
+<span class="p">$</span> swap 1 WBTC ETH <span class="f">-v</span> kyber
+<span class="p">$</span> swap 1 WBTC ETH <span class="f">-v</span> kyber,matcha,1inch
+
+<span class="c"># another chain</span>
+<span class="p">$</span> swap 1000 USDT USDC <span class="f">--chain</span> bsc
+<span class="p">$</span> swap 0.5 ETH USDC <span class="f">-c</span> base
+
+<span class="c"># include intent venues (CoW, UniswapX, Velora Delta, 1inch Fusion)</span>
+<span class="p">$</span> swap 2 WETH stETH <span class="f">--all --allow-async</span>
+
+<span class="c"># wider tolerance</span>
+<span class="p">$</span> swap 5000 USDC PEPE <span class="f">--slippage</span> 1
+
+<span class="c"># address instead of symbol</span>
+<span class="p">$</span> swap 1 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2 USDC</code></pre>
+
+      <div class="callout info">
+        <span class="label">Keys</span>
+        <p>
+          Venues that need an API key you haven't set are skipped
+          under <code>-v all</code> (stderr names the missing env vars).
+          Selecting one explicitly
+          (<code>-v matcha</code>) errors with the signup URL. See
+          <a href="#config">09</a>.
+        </p>
+      </div>
+
+      <!-- ============================================================ -->
+      <h2 id="build"><span class="num">04</span>Build &amp; simulate</h2>
+
+      <p>
+        <code>-d</code> re-quotes with your real sender and prints an
+        <strong>approve tx</strong> block (only when allowance is insufficient)
+        and a <strong>swap tx</strong> block with the target, calldata, value and
+        gas parameters, ready to broadcast. The approval target is the venue's
+        <em>spender</em>, which can differ from the tx target.
+      </p>
+
+      <pre><button class="copy" type="button">copy</button><code><span class="c"># calldata + allowance check</span>
+<span class="p">$</span> swap 100 USDC USDT <span class="f">--from</span> 0xYou <span class="f">-d</span>
+
+<span class="c"># swap the whole balance</span>
+<span class="p">$</span> swap max USDC WETH <span class="f">--from</span> 0xYou <span class="f">-d</span>
+
+<span class="c"># dry-run: pranked balance, approve + swap, actual tokenOut received</span>
+<span class="p">$</span> swap 100 USDC USDT <span class="f">--from</span> 0xYou <span class="f">--simulate</span>
+<span class="p">$</span> swap 2000 WETH stETH <span class="f">-v</span> all <span class="f">--from</span> 0xYou <span class="f">--simu -d</span>
+
+<span class="c"># against a local fork</span>
+<span class="p">$</span> swap 100 USDC USDT <span class="f">--from</span> 0xYou <span class="f">--simulate --rpc</span> http://127.0.0.1:8545</code></pre>
+
+      <p>
+        <code>--simulate</code> appends a <strong>simulation</strong> block: gas
+        used, revert reason if any, and the tokenOut that actually landed.
+        Calldata stays hidden unless you also pass <code>-d</code>. Both need an
+        RPC (<a href="#config">09</a>).
+      </p>
+
+      <!-- ============================================================ -->
+      <h2 id="browser"><span class="num">05</span>Browser signing</h2>
+
+      <p>
+        <code>--browser</code> builds the swap as for <code>-d</code>, starts a
+        tiny local server on <code>127.0.0.1:5151</code> and opens a
+        RainbowKit page in your default browser. The page shows the quote, lets
+        you connect MetaMask, Rabby, WalletConnect, …, offers a
+        <strong>simulate</strong> button, and hard-blocks signing if the
+        connected wallet is not <code>--from</code>. The tx hash or order id is
+        reported back to the terminal.
+      </p>
+
+      <pre><button class="copy" type="button">copy</button><code><span class="p">$</span> swap 0.1 WETH USDC <span class="f">--from</span> 0xYou <span class="f">--browser</span>
+<span class="p">$</span> swap 1 ETH WETH <span class="f">--from</span> 0xYou <span class="f">--browser</span>                <span class="c"># wrap</span>
+<span class="p">$</span> swap 100 USDC <span class="f">-a</span> send <span class="f">--to</span> 0xRecip <span class="f">--from</span> 0xYou <span class="f">--browser</span>
+<span class="p">$</span> swap 2 WETH stETH <span class="f">--allow-async --from</span> 0xYou <span class="f">--browser</span>   <span class="c"># sign an intent order</span></code></pre>
+
+      <p>
+        Run <code>swap</code> with no arguments to open the full interactive
+        dApp locally instead — the same UI as
+        <a href="/">swap.9summits.io</a>, served from your machine with your own
+        keys.
+      </p>
+
+      <!-- ============================================================ -->
+      <h2 id="exact-out"><span class="num">06</span>Exact-out (buy)</h2>
+
+      <p>
+        With <code>--exact-out</code> the amount is the
+        <strong>tokenOut</strong> you want and venues are ranked by the least
+        <strong>tokenIn</strong> paid. Venues with a native buy path
+        (<code>velora</code>, <code>matcha</code>, <code>uniswap</code>,
+        <code>cow</code>, <code>ophis</code>) are quoted directly; sell-only
+        venues are refined as exact-in at the best native pay and must still
+        deliver at least your target. A sell-only venue selected alone
+        (<code>-v kyber --exact-out</code>) is rejected.
+      </p>
+
+      <pre><button class="copy" type="button">copy</button><code><span class="c"># receive exactly 1 WBTC, pay as little USDC as possible</span>
+<span class="p">$</span> swap 1 USDC WBTC <span class="f">--exact-out</span>
+
+<span class="c"># build it</span>
+<span class="p">$</span> swap 1 USDC WBTC <span class="f">--exact-out --from</span> 0xYou <span class="f">-d</span>
+
+<span class="c"># just the USDC to pay</span>
+<span class="p">$</span> swap 1 USDC WBTC <span class="f">--exact-out -s</span></code></pre>
+
+      <!-- ============================================================ -->
+      <h2 id="actions"><span class="num">07</span>Wrap, send &amp; other actions</h2>
+
+      <h3>Wrap / unwrap</h3>
+      <p>
+        When the pair is the chain's native ↔ wrapped token
+        (<code>ETH ↔ WETH</code>, <code>BNB ↔ WBNB</code>,
+        <code>AVAX ↔ WAVAX</code>, <code>HYPE ↔ WHYPE</code>,
+        <code>POL ↔ WPOL</code>, <code>XDAI ↔ WXDAI</code>) the venue loop is
+        skipped: the rate is 1:1 by construction, so the CLI emits a direct
+        <code>deposit()</code> / <code>withdraw()</code> on WETH9. No approval
+        needed either way.
+      </p>
+
+      <pre><button class="copy" type="button">copy</button><code><span class="p">$</span> swap 1 ETH WETH <span class="f">-d --from</span> 0xYou              <span class="c"># wrap</span>
+<span class="p">$</span> swap 1 WETH ETH <span class="f">-d --from</span> 0xYou              <span class="c"># unwrap</span>
+<span class="p">$</span> swap 1 BNB WBNB <span class="f">--chain</span> bsc <span class="f">-d --from</span> 0xYou</code></pre>
+
+      <h3>Send (<code>-a send</code>)</h3>
+      <p>
+        A plain token transfer with the same calldata builder and
+        <code>--browser</code> flow, no DEX involved. ERC20 emits
+        <code>transfer(to, amount)</code>; native emits a value-only tx.
+        <code>tokenOut</code> is ignored.
+      </p>
+
+      <pre><button class="copy" type="button">copy</button><code><span class="p">$</span> swap 100 USDC <span class="f">-a</span> send <span class="f">--to</span> 0xRecip <span class="f">--from</span> 0xYou <span class="f">-d</span>
+<span class="p">$</span> swap 0.5 ETH  <span class="f">-a</span> send <span class="f">--to</span> 0xRecip <span class="f">--from</span> 0xYou <span class="f">--browser</span>
+<span class="p">$</span> swap max USDC <span class="f">-a</span> send <span class="f">--to</span> treasury <span class="f">--from</span> main   <span class="c"># aliases, see below</span></code></pre>
+
+      <h3>Wallet aliases (<code>-a addwallet</code>)</h3>
+      <p>
+        Register a readable name for an address once; then pass the alias to
+        <code>--from</code> or <code>--to</code>. Stored in
+        <code>~/.swap/wallets.json</code>.
+      </p>
+
+      <pre><button class="copy" type="button">copy</button><code><span class="p">$</span> swap <span class="f">-a</span> addwallet main 0xYourAddress
+<span class="p">$</span> swap <span class="f">-a</span> addwallet treasury 0xTreasuryAddress
+<span class="p">$</span> swap 1 WBTC ETH <span class="f">--from</span> main <span class="f">-d</span></code></pre>
+
+      <h3>Protocol helpers</h3>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Action</th>
+              <th>Chain</th>
+              <th>What it builds</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>-a unwrapwrseth</code></td>
+              <td>Base</td>
+              <td>Kelp wrsETH → rsETH</td>
+            </tr>
+            <tr>
+              <td><code>-a withdrawsparkweth</code></td>
+              <td>Ethereum</td>
+              <td>Spark spWETH → WETH</td>
+            </tr>
+            <tr>
+              <td><code>-a unstakesavax</code></td>
+              <td>Avalanche</td>
+              <td>BENQI sAVAX → AVAX <code>requestUnlock</code></td>
+            </tr>
+            <tr>
+              <td><code>-a claimsavax</code></td>
+              <td>Avalanche</td>
+              <td>Redeem matured sAVAX unlock requests</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <pre><button class="copy" type="button">copy</button><code><span class="p">$</span> swap 10 sAVAX <span class="f">-a</span> unstakesavax <span class="f">--chain</span> avax <span class="f">--from</span> 0xYou <span class="f">--browser</span>
+<span class="p">$</span> swap 0 sAVAX  <span class="f">-a</span> claimsavax   <span class="f">--chain</span> avax <span class="f">--from</span> 0xYou <span class="f">--browser</span></code></pre>
+
+      <!-- ============================================================ -->
+      <h2 id="venues"><span class="num">08</span>Venues &amp; chains</h2>
+
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Venue</th>
+              <th>Kind</th>
+              <th>Exact-out</th>
+              <th>Key</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>kyber</code></td>
+              <td><span class="tag sync">sync</span></td>
+              <td>refine</td>
+              <td>optional</td>
+            </tr>
+            <tr>
+              <td><code>velora</code></td>
+              <td><span class="tag sync">sync</span></td>
+              <td><span class="tag buy">native</span></td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <td><code>matcha</code></td>
+              <td><span class="tag sync">sync</span></td>
+              <td><span class="tag buy">native</span></td>
+              <td><code>ZEROEX_API_KEY</code></td>
+            </tr>
+            <tr>
+              <td><code>1inch</code></td>
+              <td><span class="tag sync">sync</span></td>
+              <td>refine</td>
+              <td><code>ONEINCH_API_KEY</code></td>
+            </tr>
+            <tr>
+              <td><code>curve</code></td>
+              <td><span class="tag sync">sync</span></td>
+              <td>refine</td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <td><code>uniswap</code></td>
+              <td><span class="tag sync">sync</span></td>
+              <td><span class="tag buy">native</span></td>
+              <td><code>UNISWAP_API_KEY</code></td>
+            </tr>
+            <tr>
+              <td><code>openocean</code></td>
+              <td><span class="tag sync">sync</span></td>
+              <td>refine</td>
+              <td>optional <code>OPENOCEAN_API_KEY</code></td>
+            </tr>
+            <tr>
+              <td><code>cow</code></td>
+              <td><span class="tag async">intent</span></td>
+              <td><span class="tag buy">native</span></td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <td><code>ophis</code></td>
+              <td><span class="tag async">intent</span></td>
+              <td><span class="tag buy">native</span></td>
+              <td><code>OPHIS_REFERRAL_CODE</code></td>
+            </tr>
+            <tr>
+              <td><code>delta</code></td>
+              <td><span class="tag async">intent</span></td>
+              <td>refine</td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <td><code>uniswapx</code></td>
+              <td><span class="tag async">intent</span></td>
+              <td>refine</td>
+              <td><code>UNISWAP_API_KEY</code></td>
+            </tr>
+            <tr>
+              <td><code>fusion</code></td>
+              <td><span class="tag async">intent</span></td>
+              <td>refine</td>
+              <td><code>ONEINCH_API_KEY</code></td>
+            </tr>
+            <tr>
+              <td><code>odos</code>, <code>odosv2</code></td>
+              <td><span class="tag off">disabled</span></td>
+              <td>—</td>
+              <td>API discontinued 2026-07-30</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        <strong>Sync</strong> venues return a broadcastable transaction.
+        <strong>Intent</strong> venues return an EIP-712 order that you sign
+        and POST off-chain; a solver settles it on-chain within the order's
+        validity window. They require <code>--allow-async</code> because the
+        output shape differs.
+      </p>
+
+      <h3 id="availability">Availability by chain</h3>
+      <p>
+        Which venues answer on which chain. Under <code>-v all</code> the CLI
+        only races the venues that serve the selected chain; the others are
+        skipped silently. Async venues still need <code>--allow-async</code>,
+        <code>curve</code> needs an RPC.
+      </p>
+
+      <div class="tablewrap matrixwrap">
+        <table class="matrix">
+          <thead>
+            <tr>
+              <th>Venue</th>
+<th><span class="ch">eth</span></th><th><span class="ch">base</span></th><th><span class="ch">arb</span></th><th><span class="ch">op</span></th><th><span class="ch">unichain</span></th><th><span class="ch">bsc</span></th><th><span class="ch">avax</span></th><th><span class="ch">hype</span></th><th><span class="ch">robinhood</span></th><th><span class="ch">monad</span></th><th><span class="ch">plasma</span></th><th><span class="ch">polygon</span></th><th><span class="ch">gnosis</span></th><th><span class="ch">ink</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>kyber</code> <span class="tag sync">sync</span></td>
+<td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td><td class="n">·</td>
+            </tr>
+            <tr>
+              <td><code>velora</code> <span class="tag sync">sync</span></td>
+<td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td>
+            </tr>
+            <tr>
+              <td><code>matcha</code> <span class="tag sync">sync</span></td>
+<td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td><td class="y">✓</td>
+            </tr>
+            <tr>
+              <td><code>1inch</code> <span class="tag sync">sync</span></td>
+<td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td>
+            </tr>
+            <tr>
+              <td><code>curve</code> <span class="tag sync">sync</span></td>
+<td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td><td class="n">·</td><td class="y">✓</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="y">✓</td><td class="n">·</td>
+            </tr>
+            <tr>
+              <td><code>uniswap</code> <span class="tag sync">sync</span></td>
+<td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td><td class="y">✓</td><td class="n">·</td><td class="y">✓</td>
+            </tr>
+            <tr>
+              <td><code>openocean</code> <span class="tag sync">sync</span></td>
+<td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td><td class="n">·</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td><td class="y">✓</td><td class="n">·</td><td class="n">·</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td>
+            </tr>
+            <tr>
+              <td><code>cow</code> <span class="tag async">intent</span></td>
+<td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td>
+            </tr>
+            <tr>
+              <td><code>ophis</code> <span class="tag async">intent</span></td>
+<td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td><td class="y">✓</td><td class="n">·</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td>
+            </tr>
+            <tr>
+              <td><code>delta</code> <span class="tag async">intent</span></td>
+<td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="y">✓</td><td class="n">·</td><td class="n">·</td>
+            </tr>
+            <tr>
+              <td><code>uniswapx</code> <span class="tag async">intent</span></td>
+<td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td><td class="y">✓</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td>
+            </tr>
+            <tr>
+              <td><code>fusion</code> <span class="tag async">intent</span></td>
+<td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td>venues per chain</td>
+<td class="cnt">12</td><td class="cnt">12</td><td class="cnt">12</td><td class="cnt">9</td><td class="cnt">8</td><td class="cnt">9</td><td class="cnt">10</td><td class="cnt">1</td><td class="cnt">7</td><td class="cnt">5</td><td class="cnt">3</td><td class="cnt">10</td><td class="cnt">7</td><td class="cnt">4</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <p class="matrixlegend">
+        <span class="y">✓</span> served &nbsp; <span class="n">·</span> not served.
+        Snapshot of the adapters' chain tables; the live set for a deployment
+        is <code>GET /api/mode</code>.
+      </p>
+
+      <h3>Chains</h3>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Alias</th>
+              <th>Chain</th>
+              <th>Native</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><code>eth</code></td><td>Ethereum (default)</td><td>ETH</td></tr>
+            <tr><td><code>base</code></td><td>Base</td><td>ETH</td></tr>
+            <tr><td><code>arb</code></td><td>Arbitrum One</td><td>ETH</td></tr>
+            <tr><td><code>op</code></td><td>Optimism</td><td>ETH</td></tr>
+            <tr><td><code>unichain</code></td><td>Unichain</td><td>ETH</td></tr>
+            <tr><td><code>bsc</code></td><td>BNB Chain</td><td>BNB</td></tr>
+            <tr><td><code>avax</code></td><td>Avalanche</td><td>AVAX</td></tr>
+            <tr><td><code>hype</code></td><td>HyperEVM</td><td>HYPE</td></tr>
+            <tr><td><code>robinhood</code></td><td>Robinhood Chain</td><td>ETH</td></tr>
+            <tr><td><code>monad</code></td><td>Monad</td><td>MON</td></tr>
+            <tr><td><code>plasma</code></td><td>Plasma</td><td>XPL</td></tr>
+            <tr><td><code>polygon</code></td><td>Polygon</td><td>POL</td></tr>
+            <tr><td><code>gnosis</code></td><td>Gnosis</td><td>XDAI</td></tr>
+            <tr><td><code>ink</code></td><td>Ink</td><td>ETH</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ============================================================ -->
+      <h2 id="config"><span class="num">09</span>RPC, keys &amp; config</h2>
+
+      <h3>RPC</h3>
+      <p>
+        Needed for <code>-d</code>, <code>--simulate</code>,
+        <code>--browser</code> and <code>max</code>. Resolution order, first
+        match wins:
+      </p>
+      <ol>
+        <li><code>--rpc &lt;url&gt;</code> on the command line</li>
+        <li><code>RPC_URL_&lt;chainId&gt;</code> — e.g. <code>RPC_URL_1</code></li>
+        <li><code>&lt;ALIAS&gt;_RPC_URL</code> — e.g. <code>ETH_RPC_URL</code>, <code>BASE_RPC_URL</code></li>
+        <li><code>ALCHEMY_API_KEY</code> — one key covers every supported chain (free tier is enough)</li>
+      </ol>
+
+      <div class="callout">
+        <span class="label">No public RPC fallback (CLI)</span>
+        <p>
+          Missing RPC config is a hard failure that names the exact variable to
+          set. Public RPCs rate-limit and return inconsistent allowance reads,
+          which would silently break the CLI build path. The interactive dApp
+          server last-resorts to the shared PublicNode table when Alchemy and
+          per-chain overrides are unset.
+        </p>
+      </div>
+
+      <h3>Where config lives</h3>
+      <p>
+        Shell environment first, then a <code>.env</code> in the current
+        directory, then <code>~/.swap/config</code> (written by
+        <code>--init</code> / the first-run prompt), then values embedded in
+        the binary at build time. Prebuilt binaries ship venue keys and
+        referral settings; your RPC key is always yours to configure.
+      </p>
+
+      <h3>Venue API keys</h3>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Variable</th>
+              <th>Unlocks</th>
+              <th>Free signup</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>ZEROEX_API_KEY</code></td>
+              <td><code>matcha</code></td>
+              <td><a href="https://dashboard.0x.org">dashboard.0x.org</a></td>
+            </tr>
+            <tr>
+              <td><code>ONEINCH_API_KEY</code></td>
+              <td><code>1inch</code>, <code>fusion</code></td>
+              <td><a href="https://portal.1inch.dev">portal.1inch.dev</a></td>
+            </tr>
+            <tr>
+              <td><code>UNISWAP_API_KEY</code></td>
+              <td><code>uniswap</code>, <code>uniswapx</code></td>
+              <td><a href="https://hub.uniswap.org">hub.uniswap.org</a></td>
+            </tr>
+            <tr>
+              <td><code>KYBER_API_KEY</code></td>
+              <td><code>kyber</code> API gateway, higher rate limits (optional). <code>KYBER_SOURCE</code> / <code>KYBER_REFERRAL</code> add on-chain attribution</td>
+              <td><a href="mailto:business@kyber.network">business@kyber.network</a></td>
+            </tr>
+            <tr>
+              <td><code>OPENOCEAN_API_KEY</code></td>
+              <td><code>openocean</code> enterprise host, higher limits (optional; public host is keyless, 2 rps)</td>
+              <td><a href="https://docs.openocean.finance/docs/swap-api/enterprise">docs.openocean.finance</a></td>
+            </tr>
+            <tr>
+              <td><code>OPHIS_REFERRAL_CODE</code></td>
+              <td><code>ophis</code> (skipped without it)</td>
+              <td>CIP-75 rebate code</td>
+            </tr>
+            <tr>
+              <td><code>SENDER_ADDRESS</code></td>
+              <td>default for <code>--from</code></td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <td><code>WALLETCONNECT_PROJECT_ID</code></td>
+              <td>WalletConnect in <code>--browser</code> (injected wallets work without it)</td>
+              <td>—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Partner fees</h3>
+      <p>
+        Set <code>REFERRAL_ADDRESS</code> and optionally
+        <code>REFERRAL_FEE_BPS</code> (1 bp = 0.01 %) to attribute a fee on
+        every venue that supports it; the fee is already reflected in the quoted
+        amounts so venues stay comparable. <code>--nofee</code> zeroes it for one
+        run.
+      </p>
+
+      <!-- ============================================================ -->
+      <h2 id="output"><span class="num">10</span>Output &amp; scripting</h2>
+
+      <div class="grid">
+        <div class="card">
+          <span class="t">default</span>
+          <p>
+            Route tree, rate / gas / venue / router rows, bold summary, and the
+            live venue comparison under <code>-v all</code>.
+          </p>
+        </div>
+        <div class="card">
+          <span class="t">--json</span>
+          <p>
+            One object: <code>best</code> (venue name),
+            <code>quotes</code> (keyed by venue), <code>approval</code>,
+            <code>tx</code>, <code>order</code>, <code>simulation</code>.
+            Errors are <code>{"error": "…"}</code> with exit 1.
+          </p>
+        </div>
+        <div class="card">
+          <span class="t">-s / --simple</span>
+          <p>
+            Just the human-units number. <code>amountOut</code> by default,
+            <code>amountIn</code> under <code>--exact-out</code>.
+          </p>
+        </div>
+      </div>
+
+      <pre><button class="copy" type="button">copy</button><code><span class="c"># capture the rate in a script</span>
+<span class="p">$</span> RATE=$(swap 1 WBTC ETH <span class="f">-s</span>)
+
+<span class="c"># the winning venue, then its full quote</span>
+<span class="p">$</span> swap 1 WBTC ETH <span class="f">--all --json</span> | jq -r '.best'
+<span class="p">$</span> swap 1 WBTC ETH <span class="f">--all --json</span> | jq '.quotes[.best]'
+
+<span class="c"># calldata only, straight to another tool</span>
+<span class="p">$</span> swap 100 USDC USDT <span class="f">--from</span> 0xYou <span class="f">-d --json</span> | jq -r '.tx.data'
+
+<span class="c"># every venue's amountOut, best first</span>
+<span class="p">$</span> swap 1000 USDC USDT <span class="f">--json</span> | jq -r '.quotes | to_entries[] | select(.value.amountOut) | "\(.key)\t\(.value.amountOut.human)"' | sort -k2 -gr</code></pre>
+
+      <p>
+        Human-readable output goes to stdout; warnings and progress go to
+        stderr, so piping <code>--json</code> or <code>-s</code> stays clean.
+      </p>
+
+      <!-- ============================================================ -->
+      <h2 id="agents"><span class="num">11</span>Unattended use &amp; agents</h2>
+
+      <p>
+        The CLI is safe to drive from scripts, CI and AI agents: it never waits
+        on stdin when it is not a terminal, everything is configurable through
+        the environment, and <code>--json</code> gives a stable shape.
+      </p>
+
+      <ul>
+        <li>
+          <strong>No prompts without a TTY.</strong> The first-run RPC prompt is
+          skipped when stdin or stderr is not a terminal; <code>--init</code>
+          exits 1 instead of hanging. <code>--json</code> / <code>-s</code>
+          also suppress it.
+        </li>
+        <li>
+          <strong>Exit codes.</strong> <code>0</code> success, <code>1</code>
+          any error, message on stderr and <code>{"error": "…"}</code> on
+          stdout under <code>--json</code>.
+        </li>
+        <li>
+          <strong>Configure via env.</strong> <code>ALCHEMY_API_KEY</code> or
+          <code>RPC_URL_&lt;chainId&gt;</code>, <code>SENDER_ADDRESS</code>,
+          venue keys as needed. A <code>.env</code> in the working directory is
+          read too.
+        </li>
+        <li>
+          <strong>Headless.</strong> <code>NO_BROWSER_OPEN=1</code> starts
+          <code>swap</code> / <code>--browser</code> without launching a
+          browser; the URL is printed to stderr. <code>SWAP_NO_AUTH=1</code>
+          drops the local server's <code>?id=</code> gate.
+        </li>
+        <li>
+          <strong>HTTP API.</strong> The local server and the public host
+          expose the same stateless <code>/api/*</code> contract, described in
+          <a href="/openapi.json">openapi.json</a>. The public host is rate
+          limited per IP and spends the operator's venue keys: cache, and
+          prefer the NDJSON stream.
+        </li>
+      </ul>
+
+      <div class="callout info">
+        <span class="label">Machine-readable copies</span>
+        <p>
+          This manual as Markdown: <a href="/docs.md">/docs.md</a> (also served
+          at <a href="/docs">/docs</a> with <code>Accept: text/markdown</code>).
+          Installable agent skill:
+          <a href="/skills/swap-cli/SKILL.md">/skills/swap-cli/SKILL.md</a>.
+          Site index for LLMs: <a href="/llms.txt">/llms.txt</a> and
+          <a href="/llms-full.txt">/llms-full.txt</a>.
+        </p>
+      </div>
+
+      <div class="foot">
+        <a href="/"><span class="prompt">&gt;</span> back to swap</a>
+        <span>·</span>
+        <a href="https://github.com/9summits/swap-cli">GitHub</a>
+        <span>·</span>
+        <a href="/docs.md">Markdown</a>
+        <span>·</span>
+        <a href="/openapi.json">OpenAPI</a>
+        <span>·</span>
+        <a href="/terms.html">Terms</a>
+        <span>·</span>
+        <a href="mailto:contact@9summits.io">contact@9summits.io</a>
+      </div>
+    </div>
+
+    <script>
+      // Click-to-copy on every terminal block: copies the commands without
+      // the "$" prompt, without the "# comment" lines, one command per line.
+      document.querySelectorAll("pre").forEach(function (pre) {
+        var btn = pre.querySelector(".copy");
+        if (!btn) return;
+        btn.addEventListener("click", function () {
+          var lines = pre
+            .querySelector("code")
+            .innerText.split("\n")
+            .map(function (l) {
+              return l.replace(/^\$\s?/, "").replace(/\s+#.*$/, "").trimEnd();
+            })
+            .filter(function (l) {
+              return l && !/^#/.test(l);
+            });
+          var text = lines.join("\n");
+          var done = function (ok) {
+            btn.textContent = ok ? "copied" : "failed";
+            btn.classList.toggle("ok", ok);
+            setTimeout(function () {
+              btn.textContent = "copy";
+              btn.classList.remove("ok");
+            }, 1400);
+          };
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(
+              function () {
+                done(true);
+              },
+              function () {
+                done(false);
+              }
+            );
+          } else {
+            done(false);
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

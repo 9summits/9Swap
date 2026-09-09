@@ -1,0 +1,49 @@
+# swap
+
+> DEX meta-aggregator: a browser dApp and a terminal CLI (`swap`) that race major EVM DEX aggregators for the best swap quote, rank by amount out (or amount in for exact-out), and can build executable calldata or EIP-712 intent orders. Public host: https://swap.9summits.io. License: Apache-2.0.
+
+swap is a single product with two surfaces that share the same quote/build engine:
+
+- **Web dApp** (this site): pick chain / tokens / amount, stream multi-venue quotes, connect a wallet (RainbowKit), approve and swap or sign an async order.
+- **CLI binary** `swap`: same ranking and build path from the terminal; optional local browser bridge (`--browser`) for signing.
+
+Supported chain aliases include `eth`, `arb`, `base`, `op`, `avax`, `bsc`, `hype`, `unichain`, `robinhood`, `monad`, `plasma`, `polygon`, `gnosis`, `ink`. Sync venues include KyberSwap, Odos, Velora, 0x/Matcha, 1inch, Curve, Uniswap Classic. Intent venues (CoW, Velora Delta, UniswapX, 1inch Fusion, and related) need an explicit async opt-in on the CLI (`--allow-async`) and appear in the dApp when enabled server-side.
+
+There is no separate marketing site, blog, or public pricing page. The SPA at `/` is the product UI. Source and contributor docs: https://github.com/9summits/swap-cli.
+
+## For agents (start here)
+
+- [CLI manual, Markdown](https://swap.9summits.io/docs.md): The whole `swap --help` with examples, plus an "Unattended use" section (env-only config, no prompts without a TTY, exit codes, `--json` shape). Same content as the HTML page at `/docs` (`Accept: text/markdown` on `/docs` returns this file)
+- [Agent skill](https://swap.9summits.io/skills/swap-cli/SKILL.md): Installable SKILL.md (frontmatter + instructions) that teaches an agent to install, configure and drive the CLI safely
+- [OpenAPI 3.1](https://swap.9summits.io/openapi.json): Full request/response schemas for every `/api/*` endpoint, rate limits, error shapes; servers: public host and the local `swap` server
+
+## Product
+
+- [Interactive swap dApp](https://swap.9summits.io/): Browser meta-aggregator UI — multi-venue quotes, route comparison, wallet connect, approve/swap or async order signing
+- [Full LLM context](https://swap.9summits.io/llms-full.txt): Expanded product + API description for agents that want more than the link index
+
+## CLI install
+
+- [CLI manual, HTML](https://swap.9summits.io/docs): Human-readable `swap --help` with examples — install, quoting, build/simulate, browser signing, exact-out, wrap/send/actions, venues, chains, RPC/keys, JSON and piping
+- [One-shot installer](https://swap.9summits.io/install.sh): Downloads a prebuilt `swap` binary for macOS/Linux into `~/.local/bin` (override with `SWAP_INSTALL_DIR`)
+- CLI self-update: `swap update` replaces the installed binary with the latest public prebuilt (same Vercel Blob assets as the installer; `SWAP_INSTALL_BASE` / `SWAP_INSTALL_DIR`)
+- [CLI binaries CDN](https://swap.9summits.io/cli/): Redirects to public Vercel Blob assets (`swap-<os>-<arch>`); used by the installer and `swap update`
+
+## API (stateless JSON)
+
+Handlers are stateless: no server-side quote cache. Same contract as the local `swap` interactive server. Prefer the NDJSON stream for multi-venue races. Schemas: [/openapi.json](https://swap.9summits.io/openapi.json). Per-IP limits per minute: quote-class 60, build 12, submit 6, other 120 (HTTP 429 + `Retry-After`).
+
+- [Mode / bootstrap](https://swap.9summits.io/api/mode): `GET` — interactive flag, chains, venues, buyVenues, defaultChain, WalletConnect project id
+- [Token list](https://swap.9summits.io/api/tokens): `GET ?chain=` — curated per-chain token list (native prepended)
+- [Resolve token](https://swap.9summits.io/api/resolve-token): `POST {chain,input}` — symbol or `0x` address → address, symbol, name, decimals
+- [Quote](https://swap.9summits.io/api/quote): `POST` multi-venue quotes ranked best-first
+- [Quote stream](https://swap.9summits.io/api/quote/stream): `POST` NDJSON stream (`meta` → `route`/`verror` → `done`) as venues settle
+- [Route graph](https://swap.9summits.io/api/route): `POST` symbol-labelled hops for one venue (fresh re-quote)
+- [Build tx / order](https://swap.9summits.io/api/build): `POST` re-quotes then returns executable payload (`tx`, `order`, or `permit-tx`)
+- [Assemble Permit2](https://swap.9summits.io/assemble): `POST {signature, context}` — second leg for `permit-tx` builds
+- [Submit async order](https://swap.9summits.io/submit): `POST` authed order submission (e.g. Fusion); venue/chain validated server-side
+
+## Optional
+
+- [Sitemap](https://swap.9summits.io/sitemap.xml): Public URL index for crawlers
+- [robots.txt](https://swap.9summits.io/robots.txt): Crawl rules and AI bot allowances

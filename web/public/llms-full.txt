@@ -1,0 +1,227 @@
+# swap — full agent context
+
+> DEX meta-aggregator (CLI + web dApp) that races major EVM DEX aggregator APIs, ranks quotes, and builds executable swap transactions or EIP-712 intent orders. Public deployment: https://swap.9summits.io. License: Apache-2.0. Copyright 9Summits.
+
+This file expands [/llms.txt](https://swap.9summits.io/llms.txt) with enough detail for an agent to use the product and HTTP API without scraping the SPA.
+
+## What swap is
+
+- **Not a DEX.** It does not hold liquidity. It queries third-party aggregators/solvers and presents the best route.
+- **Two UIs, one engine.** The browser dApp and the `swap` CLI share quote ranking and build logic (composition layer + venue adapters). Locally, `swap` with no args serves the dApp; with args it runs the CLI.
+- **No telemetry** in the CLI binary description; no separate SaaS account system on the public host.
+- **Public dApp has no session gate** (unlike the local CLI, which can use a session `?id=` token). Calls consume the host’s venue/RPC API quotas.
+
+## Agent quickstart
+
+1. Read https://swap.9summits.io/docs.md (CLI manual) or install the skill at https://swap.9summits.io/skills/swap-cli/SKILL.md.
+2. Install: `curl -fsSL https://swap.9summits.io/install.sh | bash` (macOS/Linux, arm64/x64; binary in `~/.local/bin`).
+3. Configure through env only: `ALCHEMY_API_KEY` (or `RPC_URL_<chainId>`), `SENDER_ADDRESS`, optional venue keys. The CLI never prompts when stdin/stderr is not a TTY; `--init` exits 1 instead of hanging.
+4. Quote with `swap 1 WBTC ETH --json`; build with `--from 0x… -d --json`; dry-run with `--simulate`. Exit code 0 on success, 1 on any error (`{"error": "…"}` on stdout under `--json`, message on stderr).
+5. Prefer the binary. If you must call HTTP, the contract is in https://swap.9summits.io/openapi.json — public host or the local `swap` server (`SWAP_NO_AUTH=1` to drop the `?id=` gate, `NO_BROWSER_OPEN=1` on headless machines).
+
+## Surfaces
+
+| Surface | How to use |
+|---------|------------|
+| Web dApp | Open https://swap.9summits.io/ — select chain, tokens, amount; quotes stream; connect wallet to execute |
+| CLI install | `curl -fsSL https://swap.9summits.io/install.sh \| bash` → binary `swap` in `~/.local/bin` |
+| CLI update | `swap update` — replace the installed binary with the latest public prebuilt (same Blob assets as the installer) |
+| CLI quote | `swap 1 WBTC ETH` — ranks venues by amountOut |
+| CLI comparison | `swap 1000 USDC USDT -v all` |
+| CLI build | `swap 100 USDC USDT --from 0x… -d` — calldata + allowance |
+| CLI simulate | `swap 100 USDC USDT --from 0x… --simulate` — `eth_simulateV1` with pranked balance |
+| CLI browser sign | `swap 0.1 WETH USDC --from 0x… --browser` — local RainbowKit page |
+| CLI exact-out | `swap 1000 USDC WETH --exact-out` — amount is tokenOut; minimize tokenIn |
+| CLI send | `swap 100 USDC -a send --to 0x… --from 0x… -d` — transfer, no DEX |
+| CLI wrap | `swap 1 ETH WETH -d --from 0x…` — direct WETH9 deposit/withdraw, no venue |
+
+Platforms for the one-shot installer and `swap update`: macOS (arm64, x64), Linux (arm64, x64). Env: `SWAP_INSTALL_DIR`, `SWAP_INSTALL_BASE`.
+
+## Chains
+
+Aliases (CLI `--chain` / API `chain` field):
+
+| Alias | Network | Native |
+|-------|---------|--------|
+| `eth` | Ethereum mainnet | ETH |
+| `arb` | Arbitrum One | ETH |
+| `base` | Base | ETH |
+| `op` | Optimism | ETH |
+| `avax` | Avalanche C-Chain | AVAX |
+| `bsc` | BNB Chain | BNB |
+| `hype` | HyperEVM | HYPE |
+| `unichain` | Unichain | ETH |
+| `robinhood` | Robinhood Chain | ETH |
+| `monad` | Monad | MON |
+| `plasma` | Plasma | XPL |
+| `polygon` | Polygon | POL |
+| `gnosis` | Gnosis | XDAI |
+| `ink` | Ink | ETH |
+
+Native token is represented internally as the sentinel address `0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee` (adapters translate at venue boundaries). Token symbols or `0x` addresses are accepted; decimals must be resolved correctly (never assumed to be 18).
+
+## Venues
+
+**Sync** (broadcastable tx): `kyber`, `odos`, `velora`, `matcha` (0x), `1inch`, `curve`, `uniswap`.
+
+**Async / intent** (sign EIP-712 + POST off-chain; filler settles on-chain): `cow`, `delta`, `uniswapx`, `fusion` (and related such as Ophis when configured). CLI requires `--allow-async`. Output is an order payload, not a simple unsigned swap tx.
+
+**Exact-out / buy-capable** (minimize tokenIn for a fixed tokenOut): includes `velora`, `matcha`, `uniswap`, `cow`, and similar buy-side paths. Sell-only venues are excluded from exact-out races. The dApp exposes the set as `buyVenues` from `GET /api/mode`.
+
+**Availability by chain** (✓ served, · not; snapshot of the CLI adapters, live set per deployment in `GET /api/mode`):
+
+| Venue | eth | base | arb | op | unichain | bsc | avax | hype | robinhood | monad | plasma | polygon | gnosis | ink |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| `kyber` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | · |
+| `velora` (sync) | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | · | · | · | ✓ | ✓ | · |
+| `matcha` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | ✓ | ✓ | · | ✓ |
+| `1inch` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | ✓ | ✓ | · |
+| `curve` (sync) | ✓ | ✓ | ✓ | ✓ | · | · | ✓ | · | · | · | · | · | ✓ | · |
+| `uniswap` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | ✓ | · | ✓ |
+| `openocean` (sync) | ✓ | ✓ | ✓ | · | · | ✓ | ✓ | · | ✓ | · | · | ✓ | ✓ | · |
+| `cow` (intent) | ✓ | ✓ | ✓ | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+| `ophis` (intent) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | · | ✓ | ✓ | ✓ | ✓ |
+| `delta` (intent) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | · | · | ✓ | · | · |
+| `uniswapx` (intent) | ✓ | ✓ | ✓ | · | ✓ | · | · | · | · | · | · | · | · | · |
+| `fusion` (intent) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | ✓ | ✓ | · |
+| *venues per chain* | 12 | 12 | 12 | 9 | 8 | 9 | 10 | 1 | 7 | 5 | 3 | 10 | 7 | 4 |
+
+Venue availability depends on server env keys (e.g. `ZEROEX_API_KEY`, `ONEINCH_API_KEY`, `UNISWAP_API_KEY`; optional `KYBER_API_KEY` moves kyber to its higher-limit API gateway; optional `OPENOCEAN_API_KEY` moves openocean to its enterprise host) and `SWAP_DISABLE_VENUES` (production often disables `curve` because cold init is slow on serverless).
+
+## Short-circuit actions (no aggregator)
+
+- **Wrap / unwrap:** native ↔ wrapped pair → direct `deposit()` / `withdraw()` on the chain’s wrapped-native contract.
+- **Send (`-a send`):** ERC-20 `transfer` or native value transfer to `--to`; no allowance for transfer path.
+
+## HTTP API (public host)
+
+Base: `https://swap.9summits.io`
+
+Contract is **stateless**: every call carries full inputs; `quoteId` is a client round key only. Local CLI may require `?id=<sid>`; production typically does not.
+
+### GET /api/mode
+
+Bootstrap for the SPA.
+
+Response fields (conceptual): `interactive`, `sid`, `chains`, `venues`, `buyVenues`, `defaultChain`, `walletConnectProjectId`.
+
+### GET /api/tokens?chain=<alias>
+
+Curated token list for the chain (native first). Used by the dApp token picker.
+
+### POST /api/resolve-token
+
+Body: `{ "chain": "eth", "input": "WBTC" }` or a `0x` address.
+
+Returns: `{ address, symbol, name, decimals }`. Fail loudly if decimals cannot be resolved.
+
+### POST /api/quote
+
+Body (conceptual):
+
+```json
+{
+  "chain": "eth",
+  "tokenInAddress": "0x…",
+  "tokenOutAddress": "0x…",
+  "amountIn": "1000000",
+  "slippageBps": 10,
+  "allowAsync": false,
+  "venues": null
+}
+```
+
+Use **either** `amountIn` **or** `amountOut` (XOR). With `amountOut`, only buy-capable venues participate. Amounts are base units (stringified integers), not human floats.
+
+Returns ranked quotes (best first for the active side). Server ranking is **gross** variable-leg amounts. The serverless path does not fetch CoinGecko. Each route includes `gasUnits` and `gasPriceWei` so a client with spots can reorder net-of-gas.
+
+### POST /api/quote/stream
+
+Same body as quote. Response: **NDJSON** lines — `meta`, then per-venue `route` or `verror`, then `done`. Stream order is unsorted. Each `route` includes `gasUnits` and `gasPriceWei`. Clients with CoinGecko prices may reorder net-of-gas. Prefer this for multi-venue UX.
+
+### POST /api/route
+
+Re-quotes a single venue and returns symbol-labelled hops for route visualization. Invalid/disabled venues are rejected.
+
+### POST /api/build
+
+Re-quotes the chosen venue (quotes go stale quickly), checks allowance when needed, returns a **Payload**:
+
+- `kind: "tx"` — broadcastable transaction fields (`to`, `data`, `value`, gas hints, spender for approval)
+- `kind: "order"` — EIP-712 typed data + submit URL for intent venues
+- `kind: "permit-tx"` — Permit2 first leg + `assembleContext` for `/assemble`
+
+**Critical:** the address that needs ERC-20 approval is `tx.spender` (or equivalent payload field), **not** always `tx.to` (Velora’s spender can diverge).
+
+Optional flags mirrored from CLI: `odosNotCompact`, `disableOdosRfq`.
+
+### POST /assemble
+
+Body: `{ "signature": "0x…", "context": <assembleContext from build> }` — Permit2 second leg; returns the final tx to broadcast.
+
+### POST /submit
+
+Authed async order submission (e.g. Fusion). Query params such as `venue`, `chainId`, `orderHash` are validated server-side; the relayer URL is reconstructed on the server (never trust a client-supplied relayer URL).
+
+### POST /simulate · POST /done · GET/POST /tx
+
+Used heavily by the local `--browser` flow. On the public dApp, simulation may be skipped or limited; `/done` is an acknowledgment callback.
+
+### Rate limits (public host)
+
+Per-IP token buckets, refilled continuously, per minute: `quote` 60 (`/api/quote`, `/api/quote/stream`, `/api/route`), `build` 12 (`/api/build`, `/assemble`), `submit` 6 (`/submit`), `light` 120 (mode, tokens, resolve-token, icon, done, tx). When drained: HTTP 429, body `{"error":"rate limited, retry shortly"}`, `Retry-After` in seconds. Not applied on the local server.
+
+### Error shape
+
+Every JSON error is `{"error": "<message>"}` with a 4xx/5xx status (400 bad input or unsupported side, 429 rate limited, 502 upstream venue/RPC failure).
+
+### Not provided
+
+There is **no** public `/api/balances` — balances are read client-side via the wallet or a public RPC so the host’s Alchemy quota is not an open hole.
+
+## CLI flags (summary)
+
+| Flag | Meaning |
+|------|---------|
+| `-v <venue\|all\|a,b>` | Venue filter; default races all available |
+| `--allow-async` | Include intent venues |
+| `--chain <alias>` | Network |
+| `--slippage <pct>` | Percent (default `0.1` = 10 bps); same value for quote and build |
+| `--exact-out` | Amount is tokenOut |
+| `--from <addr>` | Sender; required for `-d`, `--simulate`, `--browser`, `max` |
+| `-d` / `--data` | Build calldata / order |
+| `--simulate` | `eth_simulateV1` with pranked balance |
+| `--browser` | Local wallet UI for sign/send |
+| `--json` | Machine-readable output |
+| `-s` / `--simple` | Print only the numeric variable leg |
+| `-a send` | Transfer instead of swap |
+
+## Safety rules agents should respect
+
+1. **Decimals are safety-critical.** Never invent or coerce `decimals` to 18.
+2. **Approval target = spender**, not necessarily the router `to`.
+3. **Same slippage** for quote and build so displayed route matches execution.
+4. **Async orders:** never put the quote-only dead-address placeholder into a signed order; re-quote with the real sender.
+5. **No public RPC fallbacks in the CLI** — missing RPC config fails with the env var name to set. The hosted dApp last-resorts to the shared PublicNode table when Alchemy and per-chain overrides are unset.
+6. **Do not treat this host’s `/api/*` as unlimited free infrastructure** — it consumes operator API keys; rate-limit and cache responsibly.
+
+## Pricing / commercial
+
+No public pricing page. The product is open source under the Apache License 2.0. The public dApp is a free hosted instance of the same engine; availability of venues depends on the operator’s API keys.
+
+## Legal
+
+- License: Apache License 2.0 (© 9Summits; see LICENSE and NOTICE in the source repository). The prebuilt CLI binary bundles the GPL-3.0-or-later `@ophis/sdk`, so the binary as a whole is distributed under GPL-3.0 terms.
+- CLI manual (human-readable `swap --help` with examples): https://swap.9summits.io/docs (Markdown: /docs.md)
+- Terms of Use, Risk Disclaimer & Privacy: https://swap.9summits.io/terms.html (non-custodial interface, no accounts, no cookies, no trackers, no client-side analytics; keeps aggregate anonymous swap-outcome counters — venue, chain id, outcome — via server logs).
+
+## Related files on this host
+
+- https://swap.9summits.io/docs.md — CLI manual (Markdown; `/docs` with `Accept: text/markdown` serves it)
+- https://swap.9summits.io/docs — CLI manual (HTML)
+- https://swap.9summits.io/openapi.json — OpenAPI 3.1 for `/api/*`
+- https://swap.9summits.io/skills/swap-cli/SKILL.md — installable agent skill
+- https://swap.9summits.io/llms.txt — compact link index (llmstxt.org)
+- https://swap.9summits.io/robots.txt — crawler rules
+- https://swap.9summits.io/sitemap.xml — public URL list
+- https://swap.9summits.io/install.sh — CLI installer script

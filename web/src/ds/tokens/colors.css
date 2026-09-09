@@ -1,0 +1,84 @@
+/* ===========================================================================
+   9SUMMITS — Color tokens
+   A dark-first system. The brand lives in a single signature gradient that
+   runs orange → coral → magenta → plum, lifted straight from the summit mark.
+   Surfaces are a near-black warmed by a trace of plum so the gradient feels
+   native rather than pasted on.
+   =========================================================================== */
+
+:root {
+  /* ---------- Brand gradient stops (from the logo) ---------- */
+  --brand-orange: #ff9655;   /* summit peak / warm end   */
+  --brand-coral:  #fe6e6a;
+  --brand-rose:   #fe4d7a;
+  --brand-pink:   #ff008c;   /* signature magenta        */
+  --brand-magenta:#e90091;
+  --brand-purple: #681775;
+  --brand-plum:   #590046;   /* cool / deep end          */
+
+  /* The signature gradients */
+  --gradient-brand: linear-gradient(90deg, #ff9655 0%, #fe4d7a 45%, #ff008c 100%); /* @kind color */
+  --gradient-brand-deep: linear-gradient(120deg, #ff9655 0%, #ff008c 55%, #681775 100%); /* @kind color */
+  --gradient-summit: radial-gradient(120% 140% at 50% 0%, #ff9b54 0%, #ff008c 58%, #590046 100%); /* @kind color */
+  --gradient-glow: radial-gradient(60% 60% at 50% 0%, rgba(255,0,140,0.35) 0%, rgba(255,0,140,0) 70%); /* @kind color */
+
+  /* ---------- Neutral ink scale (dark surfaces) ---------- */
+  --ink-1000: #060509;  /* deepest, page void          */
+  --ink-950:  #0a0810;  /* app background              */
+  --ink-900:  #110e18;  /* raised background           */
+  --ink-850:  #16131f;  /* card / panel                */
+  --ink-800:  #1d1929;  /* card hover / elevated       */
+  --ink-700:  #272233;  /* borders strong / inputs     */
+  --ink-600:  #352e44;  /* hairline / divider strong   */
+  --ink-500:  #4a4259;  /* disabled fills              */
+  --ink-400:  #6c6480;  /* muted icon                  */
+  --ink-300:  #968daa;  /* placeholder text            */
+
+  /* ---------- Pure tone ---------- */
+  --white: #ffffff;
+  --black: #000000;
+
+  /* ---------- Text on dark ---------- */
+  --text-strong:  #ffffff;
+  --text-primary: #ece9f3;
+  --text-secondary: #a59fb8;
+  --text-tertiary:  #6f6982;
+  --text-disabled:  #4a4559;
+  --text-on-brand:  #ffffff;
+  --text-link:      #ff5ca8;
+
+  /* ---------- Semantic — finance ---------- */
+  --positive:      #2fe39a;  /* APR up, gains, deposits */
+  --positive-dim:  #1d7a57;
+  --positive-bg:   rgba(47,227,154,0.12);
+  --negative:      #ff5c6c;  /* losses, withdrawals     */
+  --negative-dim:  #99323c;
+  --negative-bg:   rgba(255,92,108,0.12);
+  --warning:       #ffb454;
+  --warning-bg:    rgba(255,180,84,0.12);
+  --info:          #5ca8ff;
+  --info-bg:       rgba(92,168,255,0.12);
+
+  /* ---------- Surfaces (semantic aliases) ---------- */
+  --surface-page:    var(--ink-950);
+  --surface-raised:  var(--ink-900);
+  --surface-card:    var(--ink-850);
+  --surface-elevated:var(--ink-800);
+  --surface-input:   var(--ink-900);
+  --surface-overlay: rgba(6, 5, 9, 0.72);
+  --surface-frost:   rgba(255, 255, 255, 0.04);
+  --surface-frost-strong: rgba(255, 255, 255, 0.08);
+
+  /* ---------- Borders ---------- */
+  --border-subtle:  rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.10);
+  --border-strong:  rgba(255, 255, 255, 0.16);
+  --border-brand:   rgba(255, 0, 140, 0.55);
+  --border-focus:   #ff008c;
+
+  /* ---------- Brand fills (semantic) ---------- */
+  --brand-solid:      #ff008c;
+  --brand-solid-hover:#ff2da0;
+  --brand-soft:       rgba(255, 0, 140, 0.14);
+  --brand-soft-hover: rgba(255, 0, 140, 0.22);
+}

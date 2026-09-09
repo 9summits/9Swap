@@ -1,0 +1,34 @@
+{
+  "name": "swap",
+  "version": "0.1.0",
+  "description": "CLI for DEX aggregator quotes",
+  "homepage": "https://swap.9summits.io",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "swap": "./dist/swap"
+  },
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "build": "./build",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test tests/*.test.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed"
+  },
+  "dependencies": {
+    "@1inch/fusion-sdk": "^2.4.9",
+    "@curvefi/api": "^2.69.0",
+    "@noble/hashes": "^2.2.0",
+    "@ophis/sdk": "0.4.2",
+    "axios": "^1.17.0",
+    "commander": "^12.1.0",
+    "picocolors": "^1.1.1",
+    "viem": "^2.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@types/bun": "latest",
+    "typescript": "^5.6.0"
+  }
+}

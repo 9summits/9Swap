@@ -1,0 +1,63 @@
+# swap — https://swap.9summits.io
+# AI / agent discovery: /llms.txt (index), /llms-full.txt (full context),
+# /docs.md (CLI manual, Markdown), /openapi.json (HTTP API schemas),
+# /skills/swap-cli/SKILL.md (installable agent skill)
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Meta-ExternalAgent
+Allow: /
+
+User-agent: MistralAI-User
+Allow: /
+
+User-agent: DuckAssistBot
+Allow: /
+
+User-agent: cohere-ai
+Allow: /
+
+User-agent: YouBot
+Allow: /
+
+# Default rules for all other crawlers
+User-agent: *
+Allow: /
+
+# Serverless quote/build endpoints are not useful for indexing
+Disallow: /api/
+Disallow: /assemble
+Disallow: /submit
+Disallow: /done
+Disallow: /simulate
+Disallow: /tx
+
+Sitemap: https://swap.9summits.io/sitemap.xml

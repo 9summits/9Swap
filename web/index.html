@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>swap-cli</title>
+    <meta
+      name="description"
+      content="Compare quotes from 10+ DEX aggregators — 1inch, 0x, KyberSwap, Velora, CoW — across 9 EVM chains. Non-custodial, sign in your own wallet."
+    />
+    <link rel="canonical" href="https://swap.9summits.io/" />
+    <!-- Agent / LLM discovery (see web/public/llms.txt) -->
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt" />
+    <link rel="alternate" type="text/markdown" href="/docs.md" title="CLI manual (Markdown)" />
+    <link rel="alternate" type="application/json" href="/openapi.json" title="OpenAPI" />
+    <link rel="help" href="/docs" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "swap",
+        "url": "https://swap.9summits.io/",
+        "applicationCategory": "FinanceApplication",
+        "operatingSystem": "macOS, Linux, Web",
+        "description": "DEX meta-aggregator: races KyberSwap, Velora, 0x, 1inch, Curve, Uniswap, OpenOcean, CoW, UniswapX and more for the best swap quote on EVM chains, then builds the transaction or EIP-712 order for you to sign in your own wallet.",
+        "license": "https://www.apache.org/licenses/LICENSE-2.0",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "author": { "@type": "Organization", "name": "9summits", "url": "https://swap.9summits.io/" },
+        "softwareHelp": { "@type": "CreativeWork", "url": "https://swap.9summits.io/docs" },
+        "installUrl": "https://swap.9summits.io/install.sh",
+        "sameAs": ["https://github.com/9summits/swap-cli"]
+      }
+    </script>
+    <meta name="theme-color" content="#0d1117" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://swap.9summits.io/" />
+    <meta property="og:site_name" content="swap" />
+    <meta property="og:title" content="swap — DEX aggregator of aggregators" />
+    <meta
+      property="og:description"
+      content="Compare quotes from 10+ DEX aggregators — 1inch, 0x, KyberSwap, Velora, CoW — across 9 EVM chains. Non-custodial, sign in your own wallet."
+    />
+    <meta property="og:image" content="https://swap.9summits.io/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="swap — DEX aggregator of aggregators" />
+    <meta
+      name="twitter:description"
+      content="Compare quotes from 10+ DEX aggregators — 1inch, 0x, KyberSwap, Velora, CoW — across 9 EVM chains. Non-custodial, sign in your own wallet."
+    />
+    <meta name="twitter:image" content="https://swap.9summits.io/og.png" />
+
+    <!-- Favicon inlined as a data URI so vite-singlefile keeps it in
+         the embedded HTML (public/ files would copy as separate
+         assets, breaking the single-file embed in the CLI binary). -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgc2hhcGUtcmVuZGVyaW5nPSJnZW9tZXRyaWNQcmVjaXNpb24iPgogIDxkZWZzPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJ3YXJtIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMCI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI0ZFOTY1NSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iI0U5MDA5MSIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICA8L2RlZnM+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMwZDExMTciLz4KICA8cGF0aCBkPSJNMTIgMTUgTDI5IDMyIEwxMiA0OSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjM2ZiOTUwIiBzdHJva2Utd2lkdGg9IjkiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogIDxyZWN0IHg9IjM2IiB5PSI0MCIgd2lkdGg9IjE3IiBoZWlnaHQ9IjExIiByeD0iMiIgZmlsbD0idXJsKCN3YXJtKSIvPgo8L3N2Zz4K" />
+    <style>
+      :root {
+        --bg: #0d1117;
+        --panel: #161b22;
+        --border: #30363d;
+        --text: #c9d1d9;
+        --muted: #8b949e;
+        --accent: #58a6ff;
+        --green: #3fb950;
+        --red: #f85149;
+        --amber: #d29922;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+        min-height: 100vh;
+      }
+      #root {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 32px 24px 64px;
+      }
+      h1 {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0 0 8px;
+        letter-spacing: -0.02em;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 16px;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 6px 0;
+      }
+      .row .k {
+        color: var(--muted);
+      }
+      .row .v {
+        text-align: right;
+        word-break: break-all;
+      }
+      button {
+        font: inherit;
+        background: var(--accent);
+        color: #0d1117;
+        border: none;
+        padding: 10px 18px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .ok {
+        color: var(--green);
+      }
+      .err {
+        color: var(--red);
+      }
+      .pending {
+        color: var(--amber);
+      }
+      a {
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div style="padding: 32px 24px; max-width: 720px; margin: 0 auto">
+        <h1>swap</h1>
+        <p style="color: var(--muted)">loading wallet UI…</p>
+        <noscript style="color: var(--red)">
+          enable JavaScript to use the swap browser flow
+        </noscript>
+      </div>
+    </div>
+    <script>
+      // Surface any pre-React error visibly. Without this, a thrown
+      // exception during module init leaves the page blank with no clue.
+      window.addEventListener("error", function (e) {
+        // Only pre-boot, same-origin errors: once React owns #root, wiping it
+        // here cascades into "removeChild" render errors; extension-injected
+        // scripts (chrome-extension://) throw errors that aren't ours.
+        if (window.__swapBooted) return;
+        if (e.filename && e.filename.indexOf(location.origin) !== 0) return;
+        var root = document.getElementById("root");
+        if (root) {
+          root.innerHTML =
+            '<div style="padding:32px 24px;max-width:720px;margin:0 auto">' +
+            '<h1>swap — script error</h1>' +
+            '<pre style="white-space:pre-wrap;color:var(--red)">' +
+            (e.message || String(e.error)) +
+            "</pre><p style=\"color:var(--muted)\">Check the JS console for the full stack.</p></div>";
+        }
+      });
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

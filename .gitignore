@@ -1,0 +1,25 @@
+node_modules/
+dist/
+web/node_modules/
+web/dist/
+web/dist-vercel/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+
+# Local agent state — Claude Code's per-project worktrees + permission cache.
+# These are ephemeral copies of the repo, not source.
+.claude/
+.vercel
+
+# Favicon design explorations (not shipped)
+logo-claude/
+logo-grok/
+
+# Playwright e2e artifacts
+/playwright-report/
+/test-results/
+/e2e-results.json
+.env*.local

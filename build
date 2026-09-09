@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+if ! command -v bun >/dev/null 2>&1; then
+  echo "error: bun is required to build (https://bun.sh)" >&2
+  exit 1
+fi
+
+mkdir -p dist
+
+EMBEDDED_TS="src/env.embedded.ts"
+EMBEDDED_BACKUP="$(mktemp)"
+
+# If a .env exists, bake its values into src/env.embedded.ts before the
+# compile so the resulting binary works from any directory without
+# requiring the user to copy .env around. The values become a fallback —
+# shell env and a CWD .env still override at runtime.
+#
+# Restore the empty stub on exit so the working tree stays clean (and so
+# the next dev `bun run` doesn't pick up stale embedded values).
+cleanup() {
+  cp "$EMBEDDED_BACKUP" "$EMBEDDED_TS"
+  rm -f "$EMBEDDED_BACKUP"
+}
+trap cleanup EXIT INT TERM
+
+cp "$EMBEDDED_TS" "$EMBEDDED_BACKUP"
+
+# Embed policy:
+#   default build          → bake `.env` if present (local/dev binary)
+#   SWAP_PUBLIC_BUILD=1    → bake curated `.env.install` for curl|bash installs
+#                            (RPC keys still excluded by embed-env unless
+#                            --include-rpc is added deliberately). No file → empty.
+if [ "${SWAP_PUBLIC_BUILD:-}" = "1" ]; then
+  if [ -f .env.install ]; then
+    echo "public build: embedding .env.install into the binary..." >&2
+    bun scripts/embed-env.ts .env.install > "$EMBEDDED_TS"
+  else
+    echo "public build: no .env.install — binary ships with empty EMBEDDED_ENV" >&2
+  fi
+elif [ -f .env ]; then
+  echo "embedding .env values into the binary..." >&2
+  bun scripts/embed-env.ts .env > "$EMBEDDED_TS"
+fi
+
+# Build the browser-mode web app (Vite + React + RainbowKit) into a single
+# inline HTML at web/dist/index.html, which src/browser.embedded.ts imports
+# as a text asset. Skip if web/ isn't present so a checkout that only wants
+# the CLI still builds.
+if [ -d web ]; then
+  if [ ! -d web/node_modules ]; then
+    echo "installing web/ deps..." >&2
+    (cd web && bun install --silent)
+  fi
+  echo "building web/ singlefile bundle..." >&2
+  (cd web && bun run build > /dev/null 2>&1)
+fi
+
+bun build src/index.ts \
+  --compile \
+  --target=bun \
+  --outfile dist/swap
+
+echo "built dist/swap"

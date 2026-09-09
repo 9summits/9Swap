@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>Terms, Risk &amp; Privacy — swap</title>
+    <meta
+      name="description"
+      content="Terms of Use, Risk Disclaimer and Privacy notice for swap.9summits.io — a non-custodial DEX aggregator interface operated by 9summits."
+    />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgc2hhcGUtcmVuZGVyaW5nPSJnZW9tZXRyaWNQcmVjaXNpb24iPgogIDxkZWZzPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJ3YXJtIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMCI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI0ZFOTY1NSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iI0U5MDA5MSIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICA8L2RlZnM+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMwZDExMTciLz4KICA8cGF0aCBkPSJNMTIgMTUgTDI5IDMyIEwxMiA0OSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjM2ZiOTUwIiBzdHJva2Utd2lkdGg9IjkiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogIDxyZWN0IHg9IjM2IiB5PSI0MCIgd2lkdGg9IjE3IiBoZWlnaHQ9IjExIiByeD0iMiIgZmlsbD0idXJsKCN3YXJtKSIvPgo8L3N2Zz4K"
+    />
+    <style>
+      :root {
+        /* 9summits dark palette (mirrors web/src/ds/tokens/colors.css) */
+        --surface-page: #0a0810;
+        --surface-card: #16131f;
+        --border-subtle: rgba(255, 255, 255, 0.06);
+        --border-default: rgba(255, 255, 255, 0.1);
+        --text-strong: #ffffff;
+        --text-primary: #ece9f3;
+        --text-secondary: #a59fb8;
+        --text-tertiary: #6f6982;
+        --text-link: #ff5ca8;
+        --brand-solid: #ff008c;
+        --warning: #ffb454;
+        --terminal-green: #3fb950;
+        --gradient-brand: linear-gradient(
+          90deg,
+          #ff9655 0%,
+          #fe4d7a 45%,
+          #ff008c 100%
+        );
+        --font-sans: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+        --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas,
+          monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--surface-page);
+        color: var(--text-primary);
+        font-family: var(--font-sans);
+        font-size: 16px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .page {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 28px 24px 72px;
+      }
+
+      /* ---------------- top bar ---------------- */
+      .topbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 10px;
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--border-subtle);
+        font-family: var(--font-mono);
+        font-size: 13px;
+      }
+      .topbar a {
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-weight: 500;
+      }
+      .topbar a:hover {
+        color: var(--text-primary);
+      }
+      .prompt {
+        color: var(--terminal-green);
+        font-weight: 700;
+      }
+      .crumb {
+        color: var(--text-tertiary);
+      }
+
+      /* ---------------- headings ---------------- */
+      h1 {
+        margin: 36px 0 10px;
+        font-size: 30px;
+        line-height: 1.18;
+        letter-spacing: -0.02em;
+        font-weight: 700;
+        color: var(--text-strong);
+      }
+      .rule {
+        width: 72px;
+        height: 3px;
+        border-radius: 2px;
+        background: var(--gradient-brand);
+        margin: 0 0 18px;
+      }
+      .meta {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-tertiary);
+        margin: 0 0 28px;
+        letter-spacing: 0.02em;
+      }
+      h2 {
+        margin: 40px 0 12px;
+        font-size: 20px;
+        line-height: 1.25;
+        letter-spacing: -0.01em;
+        font-weight: 700;
+        color: var(--text-strong);
+      }
+      h2 .num {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--brand-solid);
+        margin-right: 10px;
+        vertical-align: 1px;
+      }
+      h3 {
+        margin: 26px 0 8px;
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+
+      /* ---------------- text ---------------- */
+      p,
+      li {
+        color: var(--text-secondary);
+      }
+      p {
+        margin: 0 0 14px;
+      }
+      ul {
+        margin: 0 0 14px;
+        padding-left: 20px;
+      }
+      li {
+        margin-bottom: 8px;
+      }
+      li::marker {
+        color: var(--text-tertiary);
+      }
+      strong {
+        color: var(--text-primary);
+        font-weight: 700;
+      }
+      a {
+        color: var(--text-link);
+        text-decoration: none;
+        border-bottom: 1px solid rgba(255, 92, 168, 0.35);
+      }
+      a:hover {
+        border-bottom-color: var(--text-link);
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        color: var(--text-primary);
+      }
+
+      /* ---------------- callout ---------------- */
+      .callout {
+        background: var(--surface-card);
+        border: 1px solid var(--border-default);
+        border-left: 3px solid var(--warning);
+        border-radius: 8px;
+        padding: 16px 18px;
+        margin: 0 0 24px;
+      }
+      .callout p:last-child {
+        margin-bottom: 0;
+      }
+      .callout .label {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--warning);
+        margin-bottom: 8px;
+      }
+
+      /* ---------------- footer ---------------- */
+      .foot {
+        margin-top: 48px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border-subtle);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-tertiary);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 14px;
+        align-items: baseline;
+      }
+      .foot a {
+        color: var(--text-secondary);
+        border-bottom: none;
+      }
+      .foot a:hover {
+        color: var(--text-primary);
+      }
+
+      @media (max-width: 520px) {
+        .page {
+          padding: 20px 16px 56px;
+        }
+        h1 {
+          font-size: 25px;
+        }
+        h2 {
+          font-size: 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <nav class="topbar">
+        <a href="/"><span class="prompt">&gt;</span> swap</a>
+        <span class="crumb">/ terms</span>
+      </nav>
+
+      <h1>Terms of Use, Risk Disclaimer &amp; Privacy</h1>
+      <div class="rule"></div>
+      <p class="meta">Last updated: 2026-09-03 · Operator: 9summits</p>
+
+      <p>
+        <strong>swap</strong> (this site, <code>swap.9summits.io</code>, and the
+        associated command-line tool) is a non-custodial interface that compares
+        swap quotes from independent DEX aggregators and builds a transaction
+        for you to sign in your own wallet. By using it you accept the terms
+        below. If you do not accept them, do not use the site.
+      </p>
+
+      <div class="callout">
+        <span class="label">Read this first</span>
+        <p>
+          This software is provided <strong>as is</strong>, with no warranty of
+          any kind. It never holds your funds and never signs for you — every
+          transaction is signed by you, from your own wallet, at your own risk.
+          Verify every transaction before you sign it.
+        </p>
+      </div>
+
+      <h2><span class="num">01</span>Terms of Use</h2>
+
+      <h3>Software provided "as is"</h3>
+      <p>
+        swap is provided on an "as is" and "as available" basis, without
+        warranties or conditions of any kind, express or implied, including but
+        not limited to merchantability, fitness for a particular purpose,
+        accuracy, or non-infringement. To the maximum extent permitted by
+        applicable law, 9summits and its contributors are not liable for any
+        loss or damage — including loss of funds, loss of profit, or
+        consequential damages — arising out of your use of, or inability to use,
+        this interface.
+      </p>
+
+      <h3>Non-custodial by design</h3>
+      <ul>
+        <li>
+          We never take custody of your assets. There is no deposit, no escrow,
+          no account holding a balance on your behalf.
+        </li>
+        <li>
+          Transactions are assembled from third-party aggregator responses and
+          handed to your wallet. <strong>You</strong> sign and broadcast them —
+          we cannot sign, cancel, reverse, or recover a transaction, and we
+          cannot access your private keys or seed phrase.
+        </li>
+        <li>
+          Token approvals you grant to a router or settlement contract are
+          granted by you, directly to that third-party contract. Review and
+          revoke them as you see fit.
+        </li>
+      </ul>
+
+      <h3>Your responsibility</h3>
+      <p>
+        You are solely responsible for reviewing every transaction — recipient,
+        token, amount, slippage, approval scope — in your wallet before signing,
+        and for the tax, regulatory, and legal consequences of your activity.
+        You are responsible for ensuring that your use of this interface is
+        lawful in your jurisdiction, and you must not use it if you are subject
+        to sanctions or otherwise prohibited from using such tools. Nothing here
+        is an offer or solicitation to anyone in a jurisdiction where such an
+        offer would be unlawful.
+      </p>
+
+      <h3>Third-party quotes and data</h3>
+      <p>
+        Quotes, routes, prices, and gas estimates come from independent
+        third-party APIs (DEX aggregators such as 1inch, 0x, KyberSwap, Odos,
+        Velora, CoW Protocol, and others), from public price feeds, and from
+        blockchain RPC endpoints. These services are outside our control. Their
+        output may be delayed, stale, incomplete, or wrong, and a quote is an
+        estimate — never a guaranteed execution price. Their own terms and
+        policies apply to the parts of the flow they operate.
+      </p>
+
+      <h3>No guaranteed availability</h3>
+      <p>
+        The interface may be modified, degraded, interrupted, or discontinued at
+        any time, without notice, in whole or in part — including because an
+        upstream API, RPC provider, or hosting platform fails. We do not
+        guarantee uptime, continuity, or that any given venue will remain
+        supported.
+      </p>
+
+      <h2><span class="num">02</span>Risk Disclaimer</h2>
+
+      <p>
+        Interacting with decentralised protocols carries serious risk, including
+        <strong>the total and irreversible loss of the assets involved</strong>.
+        Among the risks you accept:
+      </p>
+      <ul>
+        <li>
+          <strong>Volatility.</strong> Token prices can move sharply between the
+          moment a quote is displayed and the moment your transaction is mined.
+        </li>
+        <li>
+          <strong>Slippage.</strong> The amount you actually receive can be
+          worse than the quoted amount, down to the minimum you accepted when
+          setting your slippage tolerance.
+        </li>
+        <li>
+          <strong>MEV, sandwich attacks, and front-running.</strong> Public
+          mempool transactions can be observed and reordered by third parties to
+          your disadvantage.
+        </li>
+        <li>
+          <strong>Smart contract risk.</strong> Routers, settlement contracts,
+          pools, bridges, and tokens are third-party code that may contain bugs,
+          be exploited, be upgraded, or be malicious. We do not audit them.
+        </li>
+        <li>
+          <strong>Failed or stuck transactions.</strong> A transaction can
+          revert and still cost gas, or remain pending indefinitely.
+        </li>
+        <li>
+          <strong>Malicious or counterfeit tokens.</strong> Any address can be
+          imported or routed; a token symbol proves nothing. Verify contract
+          addresses yourself.
+        </li>
+        <li>
+          <strong>Operational risk.</strong> Wrong chain, wrong address,
+          compromised wallet, phishing site: none of it is recoverable. Always
+          check the URL.
+        </li>
+      </ul>
+
+      <h3>Not financial advice</h3>
+      <p>
+        Nothing on this site — quotes, rankings, route comparisons, price
+        references, or any other content — constitutes financial, investment,
+        legal, or tax advice, a recommendation, or an inducement to trade. The
+        ordering of venues reflects a mechanical comparison of API responses,
+        not an opinion on their merit or safety. Do your own research and only
+        commit funds you can afford to lose entirely.
+      </p>
+
+      <h3>Fees</h3>
+      <p>
+        Using the interface itself is free, but a partner / referral fee may be
+        included in the routes returned by some venues, via those venues' native
+        referral mechanisms. Where applicable it is already reflected in the
+        quoted output amount you see, so the comparison between venues stays
+        like-for-like. On some venues (currently Velora), positive slippage
+        above the quoted amount — the difference between the quote and a
+        better execution — may be retained by the operator through that
+        venue's native surplus mechanism; this does not reduce the quoted
+        amount itself. You also pay network gas fees, and each venue may apply
+        its own protocol or solver fees, which we do not control.
+      </p>
+
+      <h2><span class="num">03</span>Privacy</h2>
+
+      <p>
+        <strong
+          >No accounts. No cookies. No trackers. No analytics script. No
+          advertising. No personal data collection.</strong
+        >
+        We do not set a single cookie, we run no analytics or tracking script of
+        any kind, and we build no profile of you. There is nothing to sign up
+        for and nothing to log out of.
+      </p>
+
+      <h3>What passes through our infrastructure</h3>
+      <p>
+        To fetch quotes, your swap parameters — chain, token pair, amount,
+        slippage, and your wallet address when one is connected — are sent to
+        our serverless functions, which forward them to the third-party
+        aggregator APIs and return the responses to your browser. That is the
+        only purpose we use them for; we do not build a database or a
+        per-user record from them.
+      </p>
+      <p>
+        Once you sign and broadcast a swap, your browser also reports the
+        outcome to our <code>/done</code> endpoint. From that report we keep
+        an aggregate, anonymous usage counter — the venue, the chain id, and
+        the outcome (transaction sent, order placed, or error) — and nothing
+        else: no wallet address, no amount, and no IP address is stored or
+        aggregated, and no client-side analytics script runs to produce it.
+        These counters live in our hosting and logging providers' server logs
+        (currently Vercel, possibly forwarded to a log-management service)
+        and are used only for aggregate usage statistics, never to identify
+        or track an individual visitor.
+      </p>
+      <p>
+        Standard, transient infrastructure logs (request lines, error traces)
+        may also be produced by our hosting provider for operational
+        purposes.
+      </p>
+      <p>
+        Note that a wallet address is inherently public and pseudonymous
+        on-chain data. The third-party aggregators, RPC providers, and price
+        APIs that receive a request necessarily see it, and are governed by
+        their own privacy policies.
+      </p>
+
+      <h3>What your browser talks to directly</h3>
+      <ul>
+        <li>
+          Your wallet extension or app, and — only if you choose WalletConnect —
+          its relay.
+        </li>
+        <li>
+          Public price and token-metadata APIs (for example CoinGecko) used to
+          display reference rates and USD values.
+        </li>
+        <li>
+          Public token-icon CDNs (1inch, TrustWallet) used to display logos for
+          tokens outside the curated list.
+        </li>
+        <li>
+          The blockchain RPC endpoint used to read balances and broadcast your
+          signed transaction.
+        </li>
+      </ul>
+
+      <h3>What stays on your device</h3>
+      <p>
+        Your browser's local storage holds a few convenience preferences —
+        recently used tokens, tokens you imported manually, and your wallet
+        connection state. This data stays in your browser, is never transmitted
+        to us, and is removed when you clear your browser storage.
+      </p>
+
+      <h3>Feedback form</h3>
+      <p>
+        The feedback widget is the only place where you can voluntarily send us
+        information. It posts what you type — feedback type, message, and the
+        contact detail you choose to provide, if any — directly to a Google
+        Form, and is therefore also subject to Google's privacy policy. Leave
+        the contact field empty if you prefer to stay anonymous, and please do
+        not include private keys, seed phrases, or any other sensitive
+        information.
+      </p>
+
+      <h2><span class="num">04</span>Contact</h2>
+      <p>
+        Questions about these terms, this notice, or the interface:
+        <a href="mailto:contact@9summits.io">contact@9summits.io</a>. Operator:
+        9summits.
+      </p>
+      <p>
+        These terms may be updated; the date at the top of this page always
+        reflects the current version. Continued use after an update means you
+        accept the revised terms.
+      </p>
+
+      <div class="foot">
+        <a href="/"><span class="prompt">&gt;</span> back to swap</a>
+        <span>·</span>
+        <a href="mailto:contact@9summits.io">contact@9summits.io</a>
+      </div>
+    </div>
+  </body>
+</html>

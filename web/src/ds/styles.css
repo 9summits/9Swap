@@ -1,0 +1,14 @@
+/* ===========================================================================
+   9SUMMITS Design System — global entry point (ported into the swap web app)
+   Single import: pulls in every token file. Order matters: fonts → color →
+   type → spacing → base element defaults. Imported once from main.tsx so the
+   CSS variables and @font-face rules are globally available; vite-plugin-
+   singlefile inlines the woff2 (referenced via ../fonts/) as base64 data URIs
+   because assetsInlineLimit is Infinity.
+   =========================================================================== */
+
+@import "./tokens/fonts.css";
+@import "./tokens/colors.css";
+@import "./tokens/typography.css";
+@import "./tokens/spacing.css";
+@import "./tokens/base.css";
