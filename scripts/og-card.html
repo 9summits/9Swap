@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @font-face {
+        font-family: "JetBrains Mono";
+        src: url("../web/src/ds/fonts/jetbrainsmono-700.woff2") format("woff2");
+        font-weight: 700;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "JetBrains Mono";
+        src: url("../web/src/ds/fonts/jetbrainsmono-500.woff2") format("woff2");
+        font-weight: 500;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Manrope";
+        src: url("../web/src/ds/fonts/manrope-500.woff2") format("woff2");
+        font-weight: 500;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Manrope";
+        src: url("../web/src/ds/fonts/manrope-600.woff2") format("woff2");
+        font-weight: 600;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Manrope";
+        src: url("../web/src/ds/fonts/manrope-700.woff2") format("woff2");
+        font-weight: 700;
+        font-style: normal;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+        background: #0d1117;
+      }
+      .frame {
+        box-sizing: border-box;
+        width: 1200px;
+        height: 630px;
+        padding: 36px;
+        background:
+          radial-gradient(ellipse 55% 70% at 88% 12%, rgba(63, 185, 80, 0.18) 0%, transparent 62%),
+          repeating-linear-gradient(
+            0deg,
+            transparent 0,
+            transparent 31px,
+            rgba(48, 54, 61, 0.35) 31px,
+            rgba(48, 54, 61, 0.35) 32px
+          ),
+          repeating-linear-gradient(
+            90deg,
+            transparent 0,
+            transparent 31px,
+            rgba(48, 54, 61, 0.35) 31px,
+            rgba(48, 54, 61, 0.35) 32px
+          ),
+          #0d1117;
+      }
+      .card {
+        box-sizing: border-box;
+        width: 100%;
+        height: 100%;
+        border: 1px solid #30363d;
+        border-radius: 18px;
+        padding: 64px 72px 52px;
+        display: flex;
+        flex-direction: column;
+      }
+      .prompt {
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        font-weight: 500;
+        font-size: 22px;
+        color: #8b949e;
+        letter-spacing: 0.01em;
+      }
+      .prompt .gt {
+        color: #3fb950;
+        margin-right: 10px;
+      }
+      .word {
+        margin: 28px 0 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: "Manrope", system-ui, sans-serif;
+        font-weight: 700;
+        font-size: 108px;
+        line-height: 0.95;
+        letter-spacing: -0.04em;
+        color: #c9d1d9;
+      }
+      .cursor {
+        width: 10px;
+        height: 86px;
+        background: #3fb950;
+        border-radius: 2px;
+        margin-top: 8px;
+      }
+      .lead {
+        margin: 36px 0 0;
+        font-family: "Manrope", system-ui, sans-serif;
+        font-weight: 600;
+        font-size: 36px;
+        letter-spacing: -0.03em;
+        color: #c9d1d9;
+      }
+      .lead em {
+        font-style: normal;
+        color: #58a6ff;
+      }
+      .venues {
+        margin: 18px 0 0;
+        max-width: 980px;
+        font-family: "Manrope", system-ui, sans-serif;
+        font-weight: 500;
+        font-size: 24px;
+        line-height: 1.4;
+        color: #8b949e;
+      }
+      .nowrap {
+        white-space: nowrap;
+      }
+      .foot {
+        margin-top: auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        font-weight: 500;
+        font-size: 20px;
+      }
+      .host {
+        color: #3fb950;
+      }
+      .meta {
+        color: #8b949e;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="frame">
+      <div class="card">
+        <div class="prompt"><span class="gt">&gt;</span>swap 1 wbtc eth</div>
+        <div class="word">swap-cli<span class="cursor"></span></div>
+        <div class="lead"><em>CLI and dApp</em></div>
+        <div class="venues">
+          1inch · 0x · KyberSwap · Velora · CoW · Curve · Uniswap · OpenOcean · and more.
+          <span class="nowrap">Non-custodial.</span>
+        </div>
+        <div class="foot">
+          <span class="host">swap.9summits.io</span>
+          <span class="meta">14 EVM chains</span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
