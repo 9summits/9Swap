@@ -9,7 +9,7 @@ import type { HeaderProps, ChainMeta } from "./types";
 import { InstallCliBar } from "./InstallCliBar";
 
 // dApp Header — ported from the swap prototype's <Header> + <ChainChip>
-// (/tmp/9s-design/ui_kits/swap/app.jsx). Left: the favicon mark +
+// (/tmp/9s-design/ui_kits/swap/app.jsx). Left: the 9Summits "9" mark +
 // "swap-cli" wordmark. Center: install CLI pill (same row, never stacked above).
 // Right: chain selector + wallet connect (RainbowKit).
 //
@@ -17,45 +17,61 @@ import { InstallCliBar } from "./InstallCliBar";
 // connected wallet is the dApp sender (no --from in interactive mode).
 
 /* ------------------------------- brand mark ------------------------------- */
-// Same glyph as web/public/favicon.svg so the in-page mark matches the tab
-// icon. Inlined rather than imported: the typecheck has no ambient *.svg
-// module declaration. The tile is filled with a raised surface + hairline
-// because the favicon's own #0d1117 tile would vanish into the header overlay.
+// 9Summits symbol (web/src/ds/symbol_9summits.svg), inlined so the CLI
+// single-file embed does not depend on an extra asset. `size` is the height;
+// width follows the mark's 145×172 viewBox.
 function BrandMark({ size = 30 }: { size?: number }) {
+  const width = Math.round((size * 145) / 172);
   return (
     <svg
-      width={size}
+      width={width}
       height={size}
-      viewBox="0 0 64 64"
+      viewBox="0 0 145 172"
       xmlns="http://www.w3.org/2000/svg"
-      shapeRendering="geometricPrecision"
       style={{ flex: "none", display: "block" }}
       aria-hidden="true"
     >
       <defs>
-        <linearGradient id="hdr_warm" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#FE9655" />
-          <stop offset="1" stopColor="#E90091" />
+        <linearGradient id="brand9_body" x1="124.5" y1="85.9382" x2="22.5" y2="85.9382" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#E90091" />
+          <stop offset="0.346154" stopColor="#FE2F8A" />
+          <stop offset="0.5" stopColor="#FE4D7A" />
+          <stop offset="0.65" stopColor="#FE6E6A" />
+          <stop offset="1" stopColor="#FE9655" />
         </linearGradient>
+        <linearGradient id="brand9_left" x1="40.2994" y1="75.029" x2="56.7994" y2="132.529" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#FF008C" />
+          <stop offset="1" stopColor="#590046" />
+        </linearGradient>
+        <radialGradient
+          id="brand9_right"
+          cx="0"
+          cy="0"
+          r="1"
+          gradientUnits="userSpaceOnUse"
+          gradientTransform="translate(81.2994 51.0289) rotate(90) scale(102.5 81.4445)"
+        >
+          <stop stopColor="#FF9B54" />
+          <stop offset="0.61407" stopColor="#FF008C" />
+          <stop offset="1" stopColor="#681775" />
+        </radialGradient>
       </defs>
-      <rect
-        x="1"
-        y="1"
-        width="62"
-        height="62"
-        rx="13"
-        strokeWidth="2"
-        style={{ fill: "var(--surface-raised)", stroke: "var(--border-subtle)" }}
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M72.4936 0C112.516 0 145 32.4852 145 72.4976C145 89.185 139.35 104.563 129.859 116.822L129.861 116.824C128.531 118.541 127.126 120.198 125.65 121.788L81.9056 171.875H81.9007L81.8997 171.876H33.5687L58.2222 143.588C25.0367 136.951 0 107.625 0 72.4976C0 32.4852 32.4838 0 72.4936 0ZM101.414 94.3581L90.8001 63.0004L72.0384 50.7699L54.2474 62.3285L40.1488 88.8652C37.6534 83.9473 36.2466 78.3854 36.2466 72.4976C36.2466 52.4914 52.4887 36.2481 72.4936 36.2481C92.5113 36.2481 108.753 52.4914 108.753 72.4976C108.753 80.7049 106.02 88.279 101.414 94.3581Z"
+        fill="url(#brand9_body)"
       />
       <path
-        d="M12 15 L29 32 L12 49"
-        fill="none"
-        stroke="#3fb950"
-        strokeWidth="9"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M58.2229 143.587C57.5595 143.454 56.8995 143.312 56.243 143.162C37.6943 138.904 21.8518 127.522 11.7542 112.056L29.0355 98.8175L35.4162 97.7726L54.2469 62.3284L71.7221 50.8238L64.1474 62.9013L68.279 72.8385L59.2229 89.9917L68.279 107.748L56.0182 101.75L49.492 112.1L69.1223 119.155L76.5265 115.211L77.4362 121.543L58.2229 143.587ZM71.9203 50.6932L71.9993 50.6416L72.0383 50.7699L71.9203 50.6932Z"
+        fill="url(#brand9_left)"
       />
-      <rect x="36" y="40" width="17" height="11" rx="2" fill="url(#hdr_warm)" />
+      <path
+        d="M71.7235 50.8234L71.9228 50.6929L90.7966 62.9009L101.799 95.5289L110.98 105.768L121.842 106.467L129.86 116.824C128.512 118.568 127.08 120.25 125.582 121.864L81.9021 171.876H33.5701L77.4375 121.542L76.5252 115.211L69.1196 119.155L49.4908 112.1L56.0217 101.749L68.2799 107.748L59.2237 89.9922L68.2799 72.8386L64.1474 62.9009L71.7235 50.8234Z"
+        fill="url(#brand9_right)"
+      />
     </svg>
   );
 }
