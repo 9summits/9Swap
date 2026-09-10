@@ -1310,7 +1310,9 @@ const d: Record<string, React.CSSProperties> = {
     // margin:auto here would shrink-to-fit the flex item and collapse the grid.)
     flex: 1,
     width: "100%",
-    padding: "36px 40px 90px",
+    // 24px bottom so header + idle swap card + footer fit a 14" MacBook Pro
+    // fullscreen viewport (~833px). Ranked venues can still grow the page.
+    padding: "36px 40px 24px",
     boxSizing: "border-box",
     // Keep a stable scrollbar lane so quote height changes (slider re-quotes)
     // never show/hide the vertical bar and shove every column sideways.
