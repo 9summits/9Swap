@@ -116,6 +116,29 @@ import {
 //   - Venue[] → comma-separated list, comparison block over those venues
 type VenueArg = VenueOption | Venue[];
 
+/** Fill amountInUsd/amountOutUsd from the oracle when the venue left them null. */
+function fillMissingQuoteUsd(
+  quote: NormalizedQuote,
+  tokenIn: Token,
+  tokenOut: Token,
+  usdByAddr: Map<string, number | null>,
+): void {
+  const human = (base: string, decimals: number): number | null => {
+    const n = Number(fromBaseUnits(base, decimals, decimals));
+    return Number.isFinite(n) ? n : null;
+  };
+  if (quote.amountInUsd == null) {
+    const px = usdByAddr.get(tokenIn.address.toLowerCase());
+    const h = human(quote.amountIn, tokenIn.decimals);
+    if (px != null && px > 0 && h != null) quote.amountInUsd = h * px;
+  }
+  if (quote.amountOutUsd == null) {
+    const px = usdByAddr.get(tokenOut.address.toLowerCase());
+    const h = human(quote.amountOut, tokenOut.decimals);
+    if (px != null && px > 0 && h != null) quote.amountOutUsd = h * px;
+  }
+}
+
 function parseVenue(value: string): VenueArg {
   // Comma-separated list. "all" anywhere in the list collapses to "all".
   if (value.includes(",")) {
@@ -1049,6 +1072,7 @@ async function main(): Promise<void> {
             }
             winner = best;
             comparisonRank = rank;
+            fillMissingQuoteUsd(winner.quote, tokenIn, tokenOut, usdByAddr);
           } else {
             const quote = await runSingleVenue(venueArg, ctx);
             winner = { venue: venueArg, quote };

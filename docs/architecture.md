@@ -303,9 +303,10 @@ cooldown as token resolution **without** a Retry-After sleep — sleeping used t
 freeze the CLI mid-quote and a second CoinGecko hit during a storm never helped.
 The same tokens are then asked of keyless DefiLlama
 (`coins.llama.fi/prices/current`, `coingecko:{id}` or `{chain}:{address}`).
-Failures log one compact stderr line (never an `Error` object — that dumps a
-stack per token of the batch) and still fall back to the ≤10 min stale-on-error
-cache.
+A successful DefiLlama fill is silent (a recovered fallback must not punch a
+line through the live venue table). Only a total miss logs one compact stderr
+line (never an `Error` object — that dumps a stack per token of the batch),
+then the ≤10 min stale-on-error cache.
 
 `resolveAddresses(addrs, chain)` batches intermediary-token lookups via
 ks-setting's `addresses=a,b,c` parameter. Called once per quote (except in

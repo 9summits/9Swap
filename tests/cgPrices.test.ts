@@ -163,8 +163,7 @@ describe("cgPrices.fetchPairRate", () => {
     expect(cgCalls().length).toBe(1); // no retry
     expect(llamaCalls().length).toBe(1);
     expect(__cgTest.cooldownRemainingMs()).toBeGreaterThan(0);
-    expect(warns.length).toBe(1);
-    expect(String(warns[0]![0])).toContain("using DefiLlama");
+    expect(warns.length).toBe(0);
   });
 
   test("429 + DefiLlama miss: stale-on-error, one log, CoinGecko paused", async () => {
@@ -269,6 +268,6 @@ describe("cgPrices.fetchPairRate", () => {
     expect(prices.get(USDC)).toBe(1);
     expect(cgCalls().length).toBe(1);
     expect(llamaCalls().length).toBe(1);
-    expect(warns.length).toBe(1);
+    expect(warns.length).toBe(0);
   });
 });

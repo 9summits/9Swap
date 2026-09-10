@@ -243,10 +243,7 @@ async function fetchIdPrices(ids: string[]): Promise<Record<string, number | nul
         if (p != null) any = true;
         out[id] = p;
       }
-      if (any) {
-        warnOnce(`cgPrices: CoinGecko unavailable (${why}); using DefiLlama`);
-        return out;
-      }
+      if (any) return out;
     } catch (e2) {
       warnOnce(
         `cgPrices: USD prices unavailable (CoinGecko: ${why}; DefiLlama: ${errMsg(e2)})`,
@@ -279,10 +276,7 @@ async function fetchContractPrice(
       try {
         const llama = await llamaFetch([`${llamaChain}:${addr}`]);
         const p = llama.get(`${llamaChain}:${addr}`) ?? null;
-        if (p != null) {
-          warnOnce(`cgPrices: CoinGecko unavailable (${why}); using DefiLlama`);
-          return p;
-        }
+        if (p != null) return p;
       } catch (e2) {
         warnOnce(
           `cgPrices: USD prices unavailable (CoinGecko: ${why}; DefiLlama: ${errMsg(e2)})`,
