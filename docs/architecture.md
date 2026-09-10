@@ -86,7 +86,8 @@ are in [venues.md](./venues.md#venue-adapter-contract).
 1. **Quote** — `fetchAllQuotes` runs every selected adapter in parallel via
    `Promise.allSettled` and returns a `VenueResult[]`.
 2. **Pick** — `pickBest(results, side, rank)` selects by side: sell → highest
-   variable-leg key; buy → lowest, then highest gross `amountOut` on ties.
+   variable-leg key (`minAmountOut` when a venue exposes a guaranteed floor,
+   else `amountOut`); buy → lowest, then highest gross `amountOut` on ties.
    When CoinGecko can price the variable-leg token and the native gas token,
    `rank` is net-of-gas (token units after a gas haircut). Otherwise it stays
    gross. The public `/api/quote` path always passes gross (no CoinGecko on

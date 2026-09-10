@@ -329,7 +329,10 @@ async function refineSellOnlyForBuy(
     const quote = r.value;
     let out: bigint;
     try {
-      out = BigInt(quote.amountOut);
+      // Fusion's headline amountOut is the expected cote; the signed floor is
+      // minAmountOut (auction end). Refine must not accept a route whose
+      // guaranteed receive is below the exact-out target.
+      out = BigInt(quote.minAmountOut ?? quote.amountOut);
     } catch {
       return { venue, error: "sell refine: invalid amountOut" };
     }
@@ -581,7 +584,7 @@ function buildParamsForQuote(params: BuildTxParams): BuildTxParams {
   let payIn: bigint;
   try {
     target = BigInt(refine.targetAmountOut);
-    quotedOut = BigInt(params.quote.amountOut);
+    quotedOut = BigInt(params.quote.minAmountOut ?? params.quote.amountOut);
     payIn = BigInt(params.quote.amountIn);
   } catch {
     throw new Error("buyRefine quote has invalid amount fields");

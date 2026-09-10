@@ -26,7 +26,7 @@ This file expands [/llms.txt](https://swap.9summits.io/llms.txt) with enough det
 | Web dApp | Open https://swap.9summits.io/ — select chain, tokens, amount; quotes stream; connect wallet to execute |
 | CLI install | `curl -fsSL https://swap.9summits.io/install.sh \| bash` → binary `swap` in `~/.local/bin` |
 | CLI update | `swap update` — replace the installed binary with the latest public prebuilt (same Blob assets as the installer) |
-| CLI quote | `swap 1 WBTC ETH` — ranks venues by amountOut |
+| CLI quote | `swap 1 WBTC ETH` — ranks venues by amountOut (Fusion: auction-end min) |
 | CLI comparison | `swap 1000 USDC USDT -v all` |
 | CLI build | `swap 100 USDC USDT --from 0x… -d` — calldata + allowance |
 | CLI simulate | `swap 100 USDC USDT --from 0x… --simulate` — `eth_simulateV1` with pranked balance |
@@ -133,7 +133,7 @@ Body (conceptual):
 
 Use **either** `amountIn` **or** `amountOut` (XOR). With `amountOut`, only buy-capable venues participate. Amounts are base units (stringified integers), not human floats.
 
-Returns ranked quotes (best first for the active side). Server ranking is **gross** variable-leg amounts. The serverless path does not fetch CoinGecko. Each route includes `gasUnits` and `gasPriceWei` so a client with spots can reorder net-of-gas.
+Returns ranked quotes (best first for the active side). Server ranking is **gross** variable-leg amounts. Fusion routes may include `minAmountOut` (Dutch-auction floor); ranking uses that instead of the headline `amountOut` when present. The serverless path does not fetch CoinGecko. Each route includes `gasUnits` and `gasPriceWei` so a client with spots can reorder net-of-gas.
 
 ### POST /api/quote/stream
 

@@ -92,6 +92,7 @@ export type Payload = {
   tokenOut: TokenMeta;
   amountIn: string;
   amountOut: string;
+  minAmountOut?: string;
   sender: string;
   // Set only for `-a send`. For ERC20 sends the recipient is encoded in
   // tx.data, so we surface it explicitly so the UI can show it without

@@ -99,6 +99,12 @@ export type NormalizedQuote = {
   venue: Venue;
   amountIn: string;
   amountOut: string;
+  /**
+   * Guaranteed sell-side floor when `amountOut` is an optimistic cote (Fusion
+   * Dutch-auction `auctionEndAmount`). Ranking, exact-out refine, and the
+   * "min receive" UI use this when present; omitted when it equals amountOut.
+   */
+  minAmountOut?: string;
   amountInUsd: number | null;
   amountOutUsd: number | null;
   gasUnits: number | null;

@@ -13,6 +13,7 @@ import { isAsyncVenue } from "./venues/index.ts";
 import type { TradeSide } from "./trade_side.ts";
 import {
   netUsdOf,
+  sellAmountOutForRank,
   sortRoutesBySide,
   toRankQuote,
   type RankMode,
@@ -122,6 +123,11 @@ export function renderQuote(args: {
       pc.bold(`${amountInHuman} ${tokenIn.symbol}`) +
       pc.dim("  →  ") +
       pc.bold(pc.green(`${amountOutHuman} ${tokenOut.symbol}`)) +
+      (quote.minAmountOut
+        ? pc.dim(
+            `  min ${fromBaseUnits(quote.minAmountOut, tokenOut.decimals, 8)} ${tokenOut.symbol}`,
+          )
+        : "") +
       pc.dim(`   via ${quote.venue}`),
   );
   lines.push(
@@ -525,6 +531,8 @@ export function renderComparison(args: {
   const buy = side === "buy";
   const amountToken = buy ? tokenIn : tokenOut;
   const amountOf = (q: NormalizedQuote) => (buy ? q.amountIn : q.amountOut);
+  const rankOf = (q: NormalizedQuote) =>
+    buy ? q.amountIn : sellAmountOutForRank(q);
   const successes = results.flatMap((r) =>
     "quote" in r ? [{ venue: r.venue, quote: r.quote }] : [],
   );
@@ -546,7 +554,7 @@ export function renderComparison(args: {
   );
 
   const bestAmount = ranked[0]
-    ? Number(fromBaseUnits(amountOf(ranked[0].quote), amountToken.decimals, 12))
+    ? Number(fromBaseUnits(rankOf(ranked[0].quote), amountToken.decimals, 12))
     : 0;
   const winnerRow = ranked.find((s) => s.venue === best) ?? ranked[0];
   const bestNet =
@@ -560,13 +568,20 @@ export function renderComparison(args: {
     const human = Number(
       fromBaseUnits(amountOf(s.quote), amountToken.decimals, 12),
     );
+    const rankHuman = Number(
+      fromBaseUnits(rankOf(s.quote), amountToken.decimals, 12),
+    );
     const isBest = s.venue === best;
     const isAsync = isAsyncVenue(s.venue);
     const marker = isBest ? pc.green("★") : " ";
     const venueLabel = isAsync
       ? `${s.venue} ${pc.dim("(intent)")}`
       : s.venue;
-    const amountStr = `${formatNum(human)} ${amountToken.symbol}`;
+    const minNote =
+      !buy && s.quote.minAmountOut
+        ? ` ${pc.dim(`min ${formatNum(Number(fromBaseUnits(s.quote.minAmountOut, amountToken.decimals, 12)))}`)}`
+        : "";
+    const amountStr = `${formatNum(human)} ${amountToken.symbol}${minNote}`;
     const gasStr =
       s.quote.gasUsd !== null
         ? formatUsd(s.quote.gasUsd)
@@ -591,8 +606,8 @@ export function renderComparison(args: {
     } else {
       deltaStr = colorDelta(
         (buy
-          ? (bestAmount - human) / bestAmount
-          : (human - bestAmount) / bestAmount) * 100,
+          ? (bestAmount - rankHuman) / bestAmount
+          : (rankHuman - bestAmount) / bestAmount) * 100,
       );
     }
     // Pad `gas $X.XX` to a fixed visible width so the delta column lines

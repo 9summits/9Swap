@@ -24,6 +24,7 @@ export function SignOrder({
   tokenOut,
   amountIn,
   amountOut,
+  minAmountOut,
   slippageBps,
   approval,
   autoStart = false,
@@ -37,6 +38,7 @@ export function SignOrder({
   tokenOut: TokenMeta;
   amountIn: string;
   amountOut: string;
+  minAmountOut?: string;
   slippageBps: number;
   approval: ApprovalInfo | null;
   // Interactive dApp: auto-fire (approve → sign + submit) and render compact.
@@ -324,6 +326,14 @@ export function SignOrder({
             </strong>
           </span>
         </div>
+        {minAmountOut && (
+          <div className="row">
+            <span className="k">minimum</span>
+            <span className="v">
+              {fmt(minAmountOut, tokenOut.decimals)} {tokenOut.symbol}
+            </span>
+          </div>
+        )}
         <div className="row">
           <span className="k">venue</span>
           <span className="v">{order.venue} (intent / sign + POST)</span>

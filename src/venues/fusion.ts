@@ -67,6 +67,8 @@ type FusionPreset = {
   estP?: number;
 };
 
+type FusionPresetName = "fast" | "medium" | "slow" | "custom";
+
 type FusionQuoteResponse = {
   fromTokenAmount?: string;
   toTokenAmount?: string;
@@ -75,8 +77,11 @@ type FusionQuoteResponse = {
     fast?: FusionPreset;
     medium?: FusionPreset;
     slow?: FusionPreset;
+    custom?: FusionPreset;
   };
-  recommendedPreset?: "fast" | "medium" | "slow";
+  recommendedPreset?: FusionPresetName;
+  // Wire name from GET /quote/receive (SDK maps this to recommendedPreset).
+  recommended_preset?: FusionPresetName;
   prices?: {
     usd?: { fromToken?: string; toToken?: string };
   };
@@ -89,6 +94,56 @@ type FusionQuoteResponse = {
   statusCode?: number;
 };
 
+/**
+ * Fusion quoter/SDK `slippage` is percent, not bps (same unit as classic 1inch).
+ * 10 bps → 0.1. Undefined when the value isn't a usable number — callers omit
+ * the query/body field rather than sending NaN.
+ */
+export function fusionSlippagePercent(slippageBps: number): number | undefined {
+  if (!Number.isFinite(slippageBps) || slippageBps < 0) return undefined;
+  return slippageBps / 100;
+}
+
+function parsePositiveAmount(s: string | undefined): bigint | null {
+  if (typeof s !== "string" || s.length === 0) return null;
+  try {
+    const n = BigInt(s);
+    return n > 0n ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function isPresetName(s: string | undefined): s is FusionPresetName {
+  return s === "fast" || s === "medium" || s === "slow" || s === "custom";
+}
+
+/**
+ * Signed Fusion orders set `takingAmount = recommendedPreset.auctionEndAmount`
+ * (Dutch-auction floor). Headline `toTokenAmount` is the expected/start cote
+ * and overstates what pickBest should compare against other venues.
+ *
+ * Returns the floor as a base-units string only when it is strictly below the
+ * cote — otherwise ranking can keep using amountOut.
+ */
+export function fusionMinAmountOut(
+  json: FusionQuoteResponse,
+  expectedOut: string,
+): string | undefined {
+  const presets = json.presets;
+  if (!presets) return undefined;
+  const rec = json.recommendedPreset ?? json.recommended_preset;
+  const preset = (isPresetName(rec) ? presets[rec] : undefined)
+    ?? presets.fast
+    ?? presets.medium
+    ?? presets.slow
+    ?? presets.custom;
+  const end = parsePositiveAmount(preset?.auctionEndAmount);
+  const expected = parsePositiveAmount(expectedOut);
+  if (end == null || expected == null || end >= expected) return undefined;
+  return end.toString();
+}
+
 export async function quote(params: {
   chain: ChainInfo;
   tokenIn: string;
@@ -96,8 +151,17 @@ export async function quote(params: {
   amountIn: bigint;
   tokenInDecimals: number;
   tokenOutDecimals: number;
+  slippageBps?: number;
 }): Promise<NormalizedQuote> {
-  const { chain, tokenIn, tokenOut, amountIn, tokenInDecimals, tokenOutDecimals } = params;
+  const {
+    chain,
+    tokenIn,
+    tokenOut,
+    amountIn,
+    tokenInDecimals,
+    tokenOutDecimals,
+    slippageBps,
+  } = params;
 
   rejectIfNative(tokenIn, "tokenIn");
   // tokenOut native is fine — Fusion's settlement unwraps WETH → ETH
@@ -129,6 +193,11 @@ export async function quote(params: {
   // Bps value), unlike classic 1inch's percent.
   const feeBps = fusionFeeBps();
   if (feeBps > 0) url.searchParams.set("fee", String(feeBps));
+  // Same unit as classic 1inch: percent. Quote and createOrder must send the
+  // same value — otherwise the ranked floor and the signed takingAmount diverge.
+  const slippagePct =
+    slippageBps === undefined ? undefined : fusionSlippagePercent(slippageBps);
+  if (slippagePct !== undefined) url.searchParams.set("slippage", String(slippagePct));
 
   const res = await venueFetch(url.toString(), {
     headers: { accept: "application/json", authorization: `Bearer ${apiKey}` },
@@ -150,10 +219,13 @@ export async function quote(params: {
   const humanIn = Number(amountInStr) / 10 ** tokenInDecimals;
   const humanOut = Number(json.toTokenAmount) / 10 ** tokenOutDecimals;
 
+  const minAmountOut = fusionMinAmountOut(json, json.toTokenAmount);
+
   return {
     venue: "fusion",
     amountIn: amountInStr,
     amountOut: json.toTokenAmount,
+    ...(minAmountOut ? { minAmountOut } : {}),
     amountInUsd: inPx != null && Number.isFinite(humanIn) ? inPx * humanIn : null,
     amountOutUsd: outPx != null && Number.isFinite(humanOut) ? outPx * humanOut : null,
     gasUnits: null,
@@ -213,7 +285,7 @@ function fetchConnector(authKey: string) {
 export async function buildOrder(
   params: BuildTxParams,
 ): Promise<NormalizedOrder> {
-  const { chain, tokenIn, tokenOut, amountIn, sender } = params;
+  const { chain, tokenIn, tokenOut, amountIn, sender, slippageBps } = params;
 
   rejectIfNative(tokenIn, "tokenIn");
   // tokenOut native is fine — settlement unwraps WETH → ETH at fill.
@@ -240,12 +312,14 @@ export async function buildOrder(
   // bound to the signer) and wraps the recommended auction preset into a
   // Limit Order Protocol v4 struct + the Fusion extension blob.
   const feeBps = fusionFeeBps();
+  const slippagePct = fusionSlippagePercent(slippageBps);
   const prepared = await sdk.createOrder({
     fromTokenAddress: tokenIn,
     toTokenAddress: tokenOut,
     amount: amountIn.toString(),
     walletAddress: maker,
     source: referralSource(),
+    ...(slippagePct !== undefined ? { slippage: slippagePct } : {}),
     ...(feeBps > 0
       ? {
           integratorFee: {

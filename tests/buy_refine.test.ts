@@ -105,6 +105,30 @@ describe("buy ranking: min amountIn, then max amountOut on ties", () => {
 });
 
 describe("build buyRefine safety", () => {
+  test("rejects buyRefine when minAmountOut < target even if cote is above", async () => {
+    const bad = mkQuote("fusion", SEED.toString(), (TARGET + 1_000000n).toString(), {
+      minAmountOut: (TARGET - 1n).toString(),
+      buyRefine: {
+        targetAmountOut: TARGET.toString(),
+        seedAmountIn: SEED.toString(),
+      },
+    });
+    await expect(
+      build("fusion", {
+        chain: CHAIN,
+        tokenIn: WETH,
+        tokenOut: USDC,
+        tokenInDecimals: 18,
+        tokenOutDecimals: 6,
+        amountIn: SEED,
+        side: "buy",
+        sender: "0x1111111111111111111111111111111111111111",
+        slippageBps: 50,
+        quote: bad,
+      }),
+    ).rejects.toThrow(/below target/i);
+  });
+
   test("rejects buyRefine when amountOut < target (no silent under-delivery)", async () => {
     const bad = mkQuote("kyber", SEED.toString(), (TARGET - 1n).toString(), {
       buyRefine: {

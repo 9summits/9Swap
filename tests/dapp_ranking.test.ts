@@ -14,6 +14,15 @@ type R = {
   execution: Execution;
 };
 
+test("sell ranks Fusion on minAmountOut, not the optimistic cote", () => {
+  const routes: Array<R & { minAmountOut?: string }> = [
+    { venue: "fusion", amountIn: "1000", amountOut: "3200", minAmountOut: "2900", execution: ASYNC },
+    { venue: "b", amountIn: "1000", amountOut: "3100", execution: ASYNC },
+  ];
+  const ranked = rankRoutesBySide(routes, "sell", GROSS);
+  expect(ranked.map((r) => r.venue)).toEqual(["b", "fusion"]);
+});
+
 test("sell ranks by descending amountOut (most received first)", () => {
   const routes: R[] = [
     { venue: "a", amountIn: "1000", amountOut: "3000", execution: ASYNC },

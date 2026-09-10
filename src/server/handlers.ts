@@ -527,6 +527,9 @@ export async function handleQuote(req: Request): Promise<Response> {
             venue: r.venue,
             amountIn: r.quote.amountIn,
             amountOut: r.quote.amountOut,
+            ...(r.quote.minAmountOut
+              ? { minAmountOut: r.quote.minAmountOut }
+              : {}),
             gasUsd: r.quote.gasUsd,
             priceImpactPct:
               r.quote.amountInUsd != null &&
@@ -660,6 +663,9 @@ export async function handleQuoteStream(req: Request): Promise<Response> {
                 venue: r.venue,
                 amountIn: r.quote.amountIn,
                 amountOut: r.quote.amountOut,
+                ...(r.quote.minAmountOut
+                  ? { minAmountOut: r.quote.minAmountOut }
+                  : {}),
                 gasUsd: r.quote.gasUsd,
                 priceImpactPct:
                   r.quote.amountInUsd != null && r.quote.amountOutUsd != null && r.quote.amountInUsd > 0
@@ -861,9 +867,10 @@ export async function handleBuild(req: Request, opts?: { sid?: string }): Promis
         });
 
     if (sellRefine && amountOutFixed != null) {
-      if (BigInt(quote.amountOut) < amountOutFixed) {
+      const guaranteedOut = quote.minAmountOut ?? quote.amountOut;
+      if (BigInt(guaranteedOut) < amountOutFixed) {
         return errRes(
-          `sell refine below exact-out target (${quote.amountOut} < ${amountOutFixed})`,
+          `sell refine below exact-out target (${guaranteedOut} < ${amountOutFixed})`,
           502,
         );
       }
@@ -939,6 +946,7 @@ export async function handleBuild(req: Request, opts?: { sid?: string }): Promis
       tokenOut: { address: tokenOut.address, symbol: tokenOut.symbol, decimals: tokenOut.decimals },
       amountIn: respAmountIn,
       amountOut,
+      ...(quote.minAmountOut ? { minAmountOut: quote.minAmountOut } : {}),
       sender,
       recipient: b.recipient ?? null,
       slippageBps,

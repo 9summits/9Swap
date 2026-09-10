@@ -792,7 +792,9 @@
         The default action races every venue in parallel and prints the winner:
         route tree, rate, gas, chain, venue, router and token rows, then a bold
         summary line. With <code>-v all</code> a <strong>venues</strong>
-        comparison block streams below, sorted by <code>amountOut</code> with
+        comparison block streams below, sorted by guaranteed
+        <code>amountOut</code> (Fusion ranks on auction-end
+        <code>minAmountOut</code>, shown next to the cote) with
         <span class="star">★</span> on the current leader. When CoinGecko prices
         both legs, ranking is net of gas.
       </p>

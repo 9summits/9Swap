@@ -74,6 +74,11 @@ export type RouteQuote = {
   venue: string;
   amountIn: string;
   amountOut: string;
+  /**
+   * Guaranteed sell-side floor when amountOut is an optimistic cote (Fusion
+   * Dutch-auction end). Ranking uses this; the UI shows it next to the cote.
+   */
+  minAmountOut?: string;
   gasUsd: number | null;
   priceImpactPct: number | null;
   kind: "sync" | "async";

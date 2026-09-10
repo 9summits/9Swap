@@ -168,8 +168,10 @@ Two-pass race:
   (`-v all` / comma list) runs the refine pass; sell-only that never raced
   still appear as skipped rows.
 - **Ranking** — `pickBest` / `sortRoutesBySide` / dApp `rankRoutesBySide` in
-  `shared/rank.ts`: sell → max rank key; buy → min rank key, then max gross
-  `amountOut` on ties (refine surplus). When CoinGecko prices both the
+  `shared/rank.ts`: sell → max rank key (`minAmountOut` when present, else
+  `amountOut`); buy → min rank key, then max gross `amountOut` on ties
+  (refine surplus). Fusion's headline cote is optimistic (auction start);
+  the signed floor is `minAmountOut`. When CoinGecko prices both the
   variable-leg token and the native gas token, the key is net-of-gas token
   units. Async quotes count as zero user gas in net mode (solver/filler pays).
   Sync quotes missing `gasUnits` or `gasPriceWei` sink under net. Non-positive
@@ -220,7 +222,12 @@ filler/solver settles the order on-chain inside `validUntilSec`.
 - **`fusion`** (1inch Fusion) — reuses `ONEINCH_API_KEY`. Quote stays on the
   lightweight raw-fetch adapter (the quoter returns **per-token** USD spot prices
   — the adapter scales them by the human amounts before filling
-  `amountInUsd`/`amountOutUsd`). Build lazy-imports `@1inch/fusion-sdk` and calls
+  `amountInUsd`/`amountOutUsd`). Headline `amountOut` is the expected cote
+  (`toTokenAmount`); `minAmountOut` is the recommended preset's
+  `auctionEndAmount` (the signed `takingAmount` / Dutch-auction floor).
+  `pickBest` ranks on `minAmountOut` so Fusion cannot win with a start-of-auction
+  teaser. Quote and `createOrder` send the same `slippage` (percent =
+  `slippageBps / 100`). Build lazy-imports `@1inch/fusion-sdk` and calls
   `sdk.createOrder` (re-quotes with the real maker, wraps the recommended auction
   preset into a Limit Order Protocol v4 struct + the Fusion extension blob). The
   typed data's domain is the **LOP v4 router** (`0x1111…2A65` — also the spender;
@@ -265,8 +272,9 @@ broadcast a tx), so opt-in must be explicit. Without the flag, async venues are
 filtered out of `availableVenues()` (silent skip in `-v all`, mirroring
 missing-API-key behavior) and explicit `-v cow` throws
 `AsyncOptInRequiredError`. With the flag, async venues participate in `pickBest`;
-the comparison block tags their rows `(intent)` and appends a footnote noting the
-quoted amount is gross / pre-decay.
+the comparison block tags their rows `(intent)`. Fusion also surfaces
+`minAmountOut` (auction-end floor) next to the cote; ranking uses that floor,
+not the pre-decay headline.
 
 **Native-token input** — the signed-order path can't pull native ETH as
 `tokenIn` (settlement contracts pull ERC20s via `transferFrom` / Permit2 —

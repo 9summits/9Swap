@@ -124,6 +124,14 @@ export function toJson(args: {
     },
     amountIn: { raw: quote.amountIn, human: amountInHuman, usd: inUsd },
     amountOut: { raw: quote.amountOut, human: amountOutHuman, usd: outUsd },
+    ...(quote.minAmountOut
+      ? {
+          minAmountOut: {
+            raw: quote.minAmountOut,
+            human: fromBaseUnits(quote.minAmountOut, tokenOut.decimals, 12),
+          },
+        }
+      : {}),
     rate,
     inverseRate,
     priceImpactPct,

@@ -327,6 +327,10 @@
           "venue": { "$ref": "#/components/schemas/Venue" },
           "amountIn": { "$ref": "#/components/schemas/BaseUnits" },
           "amountOut": { "$ref": "#/components/schemas/BaseUnits" },
+          "minAmountOut": {
+            "$ref": "#/components/schemas/BaseUnits",
+            "description": "Guaranteed sell-side floor when amountOut is an optimistic cote (Fusion Dutch-auction auctionEndAmount). Ranking uses this when present."
+          },
           "gasUsd": { "type": ["number", "null"] },
           "priceImpactPct": { "type": ["number", "null"] },
           "kind": { "type": "string", "enum": ["sync", "async"] },

@@ -337,6 +337,7 @@ function buildPayload(sid: string, i: BrowserInputs): Payload {
     },
     amountIn: i.amountIn.toString(),
     amountOut: i.quote.amountOut,
+    ...(i.quote.minAmountOut ? { minAmountOut: i.quote.minAmountOut } : {}),
     sender: i.sender,
     recipient: i.recipient,
     slippageBps: i.slippageBps,

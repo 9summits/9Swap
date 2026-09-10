@@ -1233,6 +1233,7 @@ function ExecutionLeg({
           tokenOut={payload.tokenOut}
           amountIn={payload.amountIn}
           amountOut={payload.amountOut}
+          minAmountOut={payload.minAmountOut}
           slippageBps={payload.slippageBps}
           approval={payload.approval}
           autoStart

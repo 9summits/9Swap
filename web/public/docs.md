@@ -56,7 +56,7 @@ swap [options] <amount> <tokenIn> [tokenOut]
 
 ## 03 · Quoting
 
-Default action: race every venue in parallel, print the winner (route tree, rate, gas, venue, router, tokens, bold summary). With `-v all` a live comparison block streams below, sorted by `amountOut`, `★` on the leader. When CoinGecko prices both legs the ranking is net of gas.
+Default action: race every venue in parallel, print the winner (route tree, rate, gas, venue, router, tokens, bold summary). With `-v all` a live comparison block streams below, sorted by guaranteed `amountOut` (Fusion ranks on auction-end `minAmountOut`, shown next to the cote), `★` on the leader. When CoinGecko prices both legs the ranking is net of gas.
 
 ```sh
 swap 1 WBTC ETH                                  # all venues
@@ -227,7 +227,7 @@ Config precedence: shell env → `.env` in the current directory → `~/.swap/co
 ## 10 · Output & scripting
 
 - **default** — route tree, rate / gas / venue / router rows, bold summary, live venue comparison under `-v all`.
-- **`--json`** — one object. Multi-venue: `best` (venue name), `quotes` (object keyed by venue; each has `amountIn` / `amountOut` as `{raw, human, usd}`, or `{error}`), `chain`, `tokenIn`, `tokenOut`, plus `approval`, `tx`, `order`, `permitTx`, `simulation` when built. Errors: `{"error": "…"}` and exit code 1.
+- **`--json`** — one object. Multi-venue: `best` (venue name), `quotes` (object keyed by venue; each has `amountIn` / `amountOut` as `{raw, human, usd}`, optional `minAmountOut` for Fusion's auction floor, or `{error}`), `chain`, `tokenIn`, `tokenOut`, plus `approval`, `tx`, `order`, `permitTx`, `simulation` when built. Errors: `{"error": "…"}` and exit code 1.
 - **`-s` / `--simple`** — just the human-units number: `amountOut`, or `amountIn` under `--exact-out`.
 
 ```sh

@@ -48,6 +48,7 @@ export type Payload = {
   tokenOut: { address: string; symbol: string; decimals: number };
   amountIn: string;
   amountOut: string;
+  minAmountOut?: string;
   sender: string;
   // Recipient address for `-a send` actions; null otherwise. The page
   // uses this to show "send to <recipient>" instead of the swap labels,

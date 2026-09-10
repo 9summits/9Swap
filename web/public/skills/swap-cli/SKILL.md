@@ -48,7 +48,7 @@ Tokens: symbol (case-insensitive) or `0x` address. Amounts: human units; `max` =
 
 ## Reading `--json`
 
-Multi-venue run: `best` is the winning venue name, `quotes` is an object keyed by venue; each entry has `amountIn` / `amountOut` as `{raw, human, usd}` or `{error}`. With `-d`: `approval` (`needed`, `tx`), `tx` (`to`, `data`, `value`, `gas`, `spender`), or `order` (EIP-712 `typedData` + `submit`), plus `simulation` with `--simulate`. Errors are `{"error": "…"}` with exit code 1.
+Multi-venue run: `best` is the winning venue name, `quotes` is an object keyed by venue; each entry has `amountIn` / `amountOut` as `{raw, human, usd}` or `{error}`. Fusion also has `minAmountOut` (Dutch-auction floor) — ranking uses that, not the headline cote. With `-d`: `approval` (`needed`, `tx`), `tx` (`to`, `data`, `value`, `gas`, `spender`), or `order` (EIP-712 `typedData` + `submit`), plus `simulation` with `--simulate`. Errors are `{"error": "…"}` with exit code 1.
 
 ```sh
 swap 1 WBTC ETH --json | jq -r '.best'

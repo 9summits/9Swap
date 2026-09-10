@@ -575,6 +575,15 @@ export function SwapForm(props: SwapFormProps) {
               <div style={d.usdLine}>
                 {outUsd !== null ? `≈ ${formatUsd(outUsd)}` : " "}
               </div>
+              {mode === "swap" &&
+                !recvEditable &&
+                route?.minAmountOut &&
+                tokenOut && (
+                  <div style={d.minLine}>
+                    min {fmtAmountOut(route.minAmountOut, outDecimals)}{" "}
+                    {tokenOut.symbol}
+                  </div>
+                )}
             </>
           )}
         </div>
@@ -1431,6 +1440,13 @@ const d: Record<string, React.CSSProperties> = {
     color: "var(--text-tertiary)",
     fontFeatureSettings: '"tnum" 1',
     minHeight: 15,
+  },
+  minLine: {
+    marginTop: 4,
+    fontFamily: "var(--font-mono)",
+    fontSize: 12,
+    color: "var(--text-tertiary)",
+    fontFeatureSettings: '"tnum" 1',
   },
   tokenPill: {
     display: "inline-flex",

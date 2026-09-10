@@ -306,16 +306,18 @@ export function RoutesPane({
   }
 
   const routes = quote!.routes;
-  // Side-aware ranking display: sell ranks by amountOut (you receive, tokenOut);
-  // buy ranks by amountIn (you pay, tokenIn). The row shows the relevant amount
-  // and the gap vs the best row's anchor.
+  // Side-aware ranking display: sell ranks by minAmountOut ?? amountOut (the
+  // guaranteed floor when a venue's cote is optimistic, e.g. Fusion);
+  // buy ranks by amountIn. The row still shows the cote, with min underneath.
   const isBuy = (quote!.side ?? "sell") === "buy";
   const dispDecimals = isBuy ? quote!.tokenIn.decimals : quote!.tokenOut.decimals;
-  // routes[] is ranked best-first (max amountOut on sell / min amountIn on buy);
-  // the best row anchors the per-row gap. Base-units (bigint) for exactness.
+  // routes[] is ranked best-first; the best row's rank key anchors the gap.
   let anchor = 0n;
   try {
-    anchor = BigInt(isBuy ? routes[0].amountIn : routes[0].amountOut);
+    const best = routes[0];
+    anchor = BigInt(
+      isBuy ? best.amountIn : (best.minAmountOut ?? best.amountOut),
+    );
   } catch {
     anchor = 0n;
   }
@@ -369,10 +371,13 @@ function RouteRow({
   dispDecimals: number;
   onSelect: (venue: string) => void;
 }) {
-  // The amount this row is ranked on: what you receive (tokenOut) on sell, what
-  // you pay (tokenIn) on buy.
+  // Displayed cote: receive (tokenOut) on sell, pay (tokenIn) on buy.
   const rowAmountBase = isBuy ? q.amountIn : q.amountOut;
-  // Gap vs the best row, as a percentage off the base-units diff (exactness).
+  // Rank key: Fusion's auction-end floor on sell, else the cote / pay amount.
+  const rankAmountBase = isBuy
+    ? q.amountIn
+    : (q.minAmountOut ?? q.amountOut);
+  // Gap vs the best row, as a percentage off the rank-key diff (exactness).
   // sell: best − this (you receive LESS → shown "−"). buy: this − best (you pay
   // MORE → shown "+"). Null on the best row, which shows nothing there.
   let gapLabel: string | null = null;
@@ -380,7 +385,7 @@ function RouteRow({
     try {
       const diff = isBuy
         ? BigInt(q.amountIn) - anchor
-        : anchor - BigInt(q.amountOut);
+        : anchor - BigInt(rankAmountBase);
       if (anchor > 0n) {
         gapLabel =
           (isBuy ? "+" : "−") +
@@ -393,6 +398,10 @@ function RouteRow({
   }
 
   const amountOut = formatUnits(rowAmountBase, dispDecimals, 6);
+  const minLabel =
+    !isBuy && q.minAmountOut
+      ? `min ${formatUnits(q.minAmountOut, dispDecimals, 6)}`
+      : null;
   // Intent venues quote gas-inclusive: the solver pays settlement gas out of the
   // price, so a null gasUsd there means "included", not "unknown".
   const gasLabel =
@@ -470,6 +479,19 @@ function RouteRow({
         >
           {amountOut}
         </div>
+        {minLabel && (
+          <div
+            style={{
+              fontSize: 11,
+              color: "var(--text-tertiary)",
+              marginTop: 2,
+              fontFamily: "var(--font-mono)",
+              fontFeatureSettings: '"tnum" 1',
+            }}
+          >
+            {minLabel}
+          </div>
+        )}
         {gapLabel && (
           <div
             style={{

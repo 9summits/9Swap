@@ -7,8 +7,21 @@ export type Execution =
 export type RankQuote = {
   amountIn: string;
   amountOut: string;
+  /**
+   * Sell-side guaranteed floor when `amountOut` is optimistic (Fusion auction
+   * end). Ranking uses this instead of amountOut when present.
+   */
+  minAmountOut?: string;
   execution: Execution;
 };
+
+/** Sell rank key: guaranteed min when the venue exposes one, else the cote. */
+export function sellAmountOutForRank(q: {
+  amountOut: string;
+  minAmountOut?: string;
+}): string {
+  return q.minAmountOut ?? q.amountOut;
+}
 
 export type RankMode =
   | { readonly mode: "gross" }
@@ -93,6 +106,7 @@ export function toRankQuote(
   q: {
     amountIn: string;
     amountOut: string;
+    minAmountOut?: string;
     gasUnits: number | null;
     gasPriceWei: string | null;
   },
@@ -101,6 +115,7 @@ export function toRankQuote(
   return {
     amountIn: q.amountIn,
     amountOut: q.amountOut,
+    ...(q.minAmountOut ? { minAmountOut: q.minAmountOut } : {}),
     execution: toExecution(
       isAsync ? "async" : "sync",
       q.gasUnits,
@@ -143,14 +158,14 @@ export function rankAmount(
   side: TradeSide,
   rank: RankMode,
 ): string {
-  const gross = side === "buy" ? q.amountIn : q.amountOut;
+  const gross = side === "buy" ? q.amountIn : sellAmountOutForRank(q);
   if (rank.mode === "gross") return gross;
   const gas = userGasNative(q.execution);
   if (gas.kind === "unknown") return "";
   if (gas.kind === "zero") return gross;
   try {
     const cut = gasHaircut(gas.wei, rank);
-    if (side === "sell") return (BigInt(q.amountOut) - cut).toString();
+    if (side === "sell") return (BigInt(sellAmountOutForRank(q)) - cut).toString();
     return (BigInt(q.amountIn) + cut).toString();
   } catch {
     return "";
@@ -228,7 +243,7 @@ export function netUsdOf(
   if (rank.mode !== "net") return null;
   const gas = userGasNative(q.execution);
   if (gas.kind === "unknown") return null;
-  const amount = side === "buy" ? q.amountIn : q.amountOut;
+  const amount = side === "buy" ? q.amountIn : sellAmountOutForRank(q);
   const pos = positiveAmount(amount);
   if (pos === null) return null;
   const human = Number(pos) / 10 ** rank.tokenDecimals;
