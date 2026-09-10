@@ -1004,7 +1004,7 @@ async function main(): Promise<void> {
               })
               .catch((e) => {
                 console.error(
-                  `CoinGecko USD fetch failed: ${e instanceof Error ? e.message : e}`,
+                  `USD price fetch failed: ${e instanceof Error ? e.message : e}`,
                 );
                 return usdByAddr;
               });

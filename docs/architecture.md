@@ -88,10 +88,11 @@ are in [venues.md](./venues.md#venue-adapter-contract).
 2. **Pick** — `pickBest(results, side, rank)` selects by side: sell → highest
    variable-leg key (`minAmountOut` when a venue exposes a guaranteed floor,
    else `amountOut`); buy → lowest, then highest gross `amountOut` on ties.
-   When CoinGecko can price the variable-leg token and the native gas token,
-   `rank` is net-of-gas (token units after a gas haircut). Otherwise it stays
-   gross. The public `/api/quote` path always passes gross (no CoinGecko on
-   the serverless). Displayed amounts stay gross; only order and ★ change.
+   When a USD price is available for the variable-leg token and the native gas
+   token (CoinGecko, else DefiLlama), `rank` is net-of-gas (token units after a
+   gas haircut). Otherwise it stays gross. The public `/api/quote` path always
+   passes gross (no price oracle on the serverless). Displayed amounts stay
+   gross; only order and ★ change.
 3. **Build** — with `-d`, the winner's venue is called a second time to assemble
    an executable transaction (see [Tx build](#tx-build--d--data)).
 
@@ -293,17 +294,27 @@ further CoinGecko call fails fast **without** issuing a request. Consequences:
 
 Worst case per call is therefore ~2 requests + ≤5s, which fits the serverless
 budget (`api/resolve-token.ts` also declares `maxDuration = 60`, like the other
-entry points). The dApp's browser-side price feed (`web/src/dapp/cgPrices.ts`)
-applies the same shape — one retry (Retry-After capped at 30s there) plus a
-cooldown — falling back to its stale-on-error cache.
+entry points).
+
+USD *prices* (CLI net-of-gas ranking and the dApp mid, `web/src/dapp/cgPrices.ts`)
+treat CoinGecko as best-effort, not a blocker. Each call has a 4s
+`AbortSignal.timeout`. A 429 / 5xx / timeout / network error arms the same
+cooldown as token resolution **without** a Retry-After sleep — sleeping used to
+freeze the CLI mid-quote and a second CoinGecko hit during a storm never helped.
+The same tokens are then asked of keyless DefiLlama
+(`coins.llama.fi/prices/current`, `coingecko:{id}` or `{chain}:{address}`).
+Failures log one compact stderr line (never an `Error` object — that dumps a
+stack per token of the batch) and still fall back to the ≤10 min stale-on-error
+cache.
 
 `resolveAddresses(addrs, chain)` batches intermediary-token lookups via
 ks-setting's `addresses=a,b,c` parameter. Called once per quote (except in
 `--simple` mode) so hops render with real symbols instead of `0x1234…abcd`.
 
-**Why DeFiLlama is not in the fallback chain**: their public API has no
-symbol→address search (`coins.llama.fi/search` returns `"This endpoint doesn't
-exist"`). Only address-keyed lookups exist.
+**Why DeFiLlama is not in the token-resolution fallback chain**: their public
+API has no symbol→address search (`coins.llama.fi/search` returns `"This
+endpoint doesn't exist"`). Address-keyed *price* lookups do exist, and that is
+the CoinGecko fallback for USD prices above.
 
 ## Chains
 

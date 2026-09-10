@@ -31,6 +31,9 @@ retry (logged), then a typed `CoinGeckoRateLimitError` plus a module-level
 cooldown — bounded waits, a visible reason, and the address path still degrades
 to the on-chain `decimals()` read (see
 [token-resolution](./architecture.md#token-resolution)).
+USD prices (`web/src/dapp/cgPrices.ts`) skip the retry: CoinGecko 429 / timeout
+pauses CoinGecko, DefiLlama fills the batch, and the quote still prints. One
+compact warning, no stack dump.
 
 ## Decimals are safety-critical
 

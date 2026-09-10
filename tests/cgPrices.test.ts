@@ -9,13 +9,19 @@ const UNK_A = "0x00000000000000000000000000000000000000aa";
 const UNK_B = "0x00000000000000000000000000000000000000bb";
 
 const realFetch = globalThis.fetch;
+const realWarn = console.warn;
 // Each test installs a handler; `calls` records every requested URL.
 let handler: (url: string) => Response;
 let calls: string[];
+let warns: unknown[][];
 
 beforeEach(() => {
   __cgTest.reset();
   calls = [];
+  warns = [];
+  console.warn = (...args: unknown[]) => {
+    warns.push(args);
+  };
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input.toString();
     calls.push(url);
@@ -25,6 +31,12 @@ beforeEach(() => {
 
 afterEach(() => {
   globalThis.fetch = realFetch;
+  console.warn = realWarn;
+  // Regression: passing an Error as a console.warn argument dumps a stack
+  // into the CLI (the original 429-spam). Every path must log strings only.
+  for (const args of warns) {
+    expect(args.some((a) => a instanceof Error)).toBe(false);
+  }
 });
 
 const json = (body: unknown, init?: ResponseInit) =>
@@ -33,6 +45,12 @@ const json = (body: unknown, init?: ResponseInit) =>
     headers: { "content-type": "application/json" },
     ...init,
   });
+
+const rateLimited = () =>
+  json({ error: "rate limited" }, { status: 429, headers: { "retry-after": "0" } });
+
+const cgCalls = () => calls.filter((u) => u.includes("api.coingecko.com"));
+const llamaCalls = () => calls.filter((u) => u.includes("coins.llama.fi"));
 
 describe("cgPrices.fetchUsdPrices", () => {
   test("keys the map by input addr; native sentinel stays 0xeee", async () => {
@@ -48,6 +66,7 @@ describe("cgPrices.fetchUsdPrices", () => {
     expect(prices.get(USDC)).toBe(1);
     expect([...prices.keys()]).toEqual([NATIVE, USDC]);
     expect(calls.length).toBe(1);
+    expect(llamaCalls().length).toBe(0);
   });
 });
 
@@ -65,6 +84,7 @@ describe("cgPrices.fetchPairRate", () => {
     // A single batched request covered both sides.
     expect(calls.length).toBe(1);
     expect(calls[0]).toContain("/simple/price?ids=");
+    expect(llamaCalls().length).toBe(0);
   });
 
   test("contract fallback: id-less tokens use per-contract token_price", async () => {
@@ -81,6 +101,7 @@ describe("cgPrices.fetchPairRate", () => {
     expect(rate).toBe(2);
     expect(calls.length).toBe(2);
     expect(calls.every((u) => u.includes("/simple/token_price/"))).toBe(true);
+    expect(llamaCalls().length).toBe(0);
   });
 
   test("stale-on-error: a failed refresh serves a ≤10-min-old price", async () => {
@@ -91,9 +112,10 @@ describe("cgPrices.fetchPairRate", () => {
       throw new Error("network down");
     };
     const rate = await fetchPairRate(1, USDC, USDT);
-    // Both stale values served → 4 / 2 = 2, despite the fetch throwing.
+    // Both stale values served → 4 / 2 = 2, despite CG and DefiLlama throwing.
     expect(rate).toBe(2);
-    expect(calls.length).toBe(1); // one (failed) batch attempt
+    expect(cgCalls().length).toBe(1);
+    expect(llamaCalls().length).toBe(1);
   });
 
   test("stale ceiling: a >10-min-old price is NOT served on error", async () => {
@@ -121,17 +143,132 @@ describe("cgPrices.fetchPairRate", () => {
     expect(calls.length).toBe(1);
   });
 
-  test("429: one retry honoring Retry-After, then stale-on-error", async () => {
-    __cgTest.seed(__cgTest.resolveToken(1, USDC).key, 10, 6 * 60_000);
-    __cgTest.seed(__cgTest.resolveToken(1, USDT).key, 5, 6 * 60_000);
-    let n = 0;
-    handler = () => {
-      n++;
-      return json({ error: "rate limited" }, { status: 429, headers: { "retry-after": "0" } });
+  test("429: no CoinGecko retry; DefiLlama fills the batch", async () => {
+    handler = (url) => {
+      if (url.includes("api.coingecko.com")) return rateLimited();
+      if (url.includes("coins.llama.fi")) {
+        expect(url).toContain("coingecko:usd-coin");
+        expect(url).toContain("coingecko:tether");
+        return json({
+          coins: {
+            "coingecko:usd-coin": { price: 2 },
+            "coingecko:tether": { price: 1 },
+          },
+        });
+      }
+      throw new Error(`unexpected request: ${url}`);
     };
     const rate = await fetchPairRate(1, USDC, USDT);
-    // 10 / 5 = 2 from the stale cache after the retry also 429s.
     expect(rate).toBe(2);
-    expect(n).toBe(2); // initial + one retry
+    expect(cgCalls().length).toBe(1); // no retry
+    expect(llamaCalls().length).toBe(1);
+    expect(__cgTest.cooldownRemainingMs()).toBeGreaterThan(0);
+    expect(warns.length).toBe(1);
+    expect(String(warns[0]![0])).toContain("using DefiLlama");
+  });
+
+  test("429 + DefiLlama miss: stale-on-error, one log, CoinGecko paused", async () => {
+    __cgTest.seed(__cgTest.resolveToken(1, USDC).key, 10, 6 * 60_000);
+    __cgTest.seed(__cgTest.resolveToken(1, USDT).key, 5, 6 * 60_000);
+    handler = (url) => {
+      if (url.includes("api.coingecko.com")) return rateLimited();
+      if (url.includes("coins.llama.fi")) return rateLimited();
+      throw new Error(`unexpected request: ${url}`);
+    };
+    const rate = await fetchPairRate(1, USDC, USDT);
+    expect(rate).toBe(2); // 10 / 5 from stale
+    expect(cgCalls().length).toBe(1);
+    expect(llamaCalls().length).toBe(1);
+    expect(__cgTest.cooldownRemainingMs()).toBeGreaterThan(0);
+    // One compact failure line + one "serving stale" line — not one per token.
+    expect(warns.length).toBeLessThanOrEqual(2);
+    expect(warns.every((a) => typeof a[0] === "string")).toBe(true);
+  });
+
+  test("absence: a thrown fetch falls through to DefiLlama", async () => {
+    handler = (url) => {
+      if (url.includes("api.coingecko.com")) throw new Error("fetch failed");
+      if (url.includes("coins.llama.fi")) {
+        return json({
+          coins: {
+            "coingecko:usd-coin": { price: 8 },
+            "coingecko:tether": { price: 2 },
+          },
+        });
+      }
+      throw new Error(`unexpected request: ${url}`);
+    };
+    const rate = await fetchPairRate(1, USDC, USDT);
+    expect(rate).toBe(4);
+    expect(cgCalls().length).toBe(1);
+    expect(llamaCalls().length).toBe(1);
+    expect(__cgTest.cooldownRemainingMs()).toBeGreaterThan(0);
+  });
+
+  test("cooldown: a later lookup skips CoinGecko entirely", async () => {
+    handler = (url) => {
+      if (url.includes("api.coingecko.com")) return rateLimited();
+      if (url.includes("coins.llama.fi")) {
+        return json({
+          coins: {
+            "coingecko:usd-coin": { price: 2 },
+            "coingecko:tether": { price: 1 },
+          },
+        });
+      }
+      throw new Error(`unexpected request: ${url}`);
+    };
+    expect(await fetchPairRate(1, USDC, USDT)).toBe(2);
+    expect(cgCalls().length).toBe(1);
+
+    // Drop the 5-min positive cache so the second call would otherwise refetch.
+    __cgTest.cache.clear();
+    const mark = calls.length;
+    expect(await fetchPairRate(1, USDC, USDT)).toBe(2);
+    expect(cgCalls().length).toBe(1); // still the first one
+    expect(calls.slice(mark).every((u) => u.includes("coins.llama.fi"))).toBe(true);
+  });
+
+  test("contract 429: DefiLlama prices by chain:address", async () => {
+    handler = (url) => {
+      if (url.includes("api.coingecko.com")) return rateLimited();
+      if (url.includes("coins.llama.fi")) {
+        const path = url.slice(url.lastIndexOf("/") + 1);
+        const usd = path.includes(UNK_A) ? 4 : 2;
+        return json({ coins: { [decodeURIComponent(path)]: { price: usd } } });
+      }
+      throw new Error(`unexpected request: ${url}`);
+    };
+    const rate = await fetchPairRate(1, UNK_A, UNK_B);
+    expect(rate).toBe(2);
+    // Parallel token_price calls: both may hit CoinGecko before the first 429
+    // arms the cooldown, or the second may skip it. Either way, no retry.
+    expect(cgCalls().length).toBeGreaterThanOrEqual(1);
+    expect(cgCalls().length).toBeLessThanOrEqual(2);
+    expect(llamaCalls().length).toBe(2);
+    expect(llamaCalls().every((u) => u.includes("ethereum:0x"))).toBe(true);
+  });
+
+  test("a 3-token id batch 429 logs once, not once per token", async () => {
+    const NATIVE = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+    handler = (url) => {
+      if (url.includes("api.coingecko.com")) return rateLimited();
+      if (url.includes("coins.llama.fi")) {
+        return json({
+          coins: {
+            "coingecko:ethereum": { price: 3000 },
+            "coingecko:usd-coin": { price: 1 },
+            "coingecko:tether": { price: 1 },
+          },
+        });
+      }
+      throw new Error(`unexpected request: ${url}`);
+    };
+    const prices = await fetchUsdPrices(1, [NATIVE, USDC, USDT]);
+    expect(prices.get(NATIVE)).toBe(3000);
+    expect(prices.get(USDC)).toBe(1);
+    expect(cgCalls().length).toBe(1);
+    expect(llamaCalls().length).toBe(1);
+    expect(warns.length).toBe(1);
   });
 });

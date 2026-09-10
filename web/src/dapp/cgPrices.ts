@@ -1,26 +1,29 @@
-// cgPrices.ts — CoinGecko USD price resolution (pure logic, NO React imports).
+// cgPrices.ts — USD price resolution (pure logic, NO React imports).
 //
 // Importable from a standalone bun script as well as the React hook. Prices each
-// token of a pair in USD and returns the mid rate (pin / pout). The point of the
-// rework: resolve tokens through the generated CG_IDS table so BOTH sides can be
-// priced in ONE batched `simple/price?ids=…` call instead of two per-contract
-// `token_price` lookups (the free tier caps token_price at one contract per
-// request and rate-limits it hard). Tokens without an id fall back to the
-// per-contract token_price lookup, exactly like before.
+// token of a pair in USD and returns the mid rate (pin / pout). Tokens with a
+// CoinGecko id are batched in one `simple/price?ids=…` call; id-less tokens fall
+// back to per-contract `token_price`.
 //
-// Caching is per TOKEN (not per pair) keyed `${chainId}:${addrLower}`, so a token
-// priced for one pair is reused across every other pair it appears in:
+// CoinGecko is best-effort. A 429, timeout, or network error arms a cooldown
+// (no retry — a second hit during a storm just burns the quote render) and the
+// same tokens are asked of DefiLlama (`coins.llama.fi/prices/current`, keyless,
+// `coingecko:{id}` or `{chain}:{address}`). Failures log one compact line, never
+// an Error object (that dumps a stack into the CLI). Stale-on-error still
+// serves a positive price ≤10 min old.
+//
+// Caching is per TOKEN (not per pair) keyed `${chainId}:${addrLower}`:
 //   - fresh positive price: served for 5 min;
-//   - negative result (fetched OK but CoinGecko had no USD price): cached 2 min;
+//   - negative result (fetched OK but no USD price): cached 2 min;
 //   - stale-on-error: if a refresh fails and a positive value ≤10 min old exists,
-//     it is served (and logged) rather than dropping the reference rate.
-// Concurrent callers for the same token share one in-flight fetch. Every failure
-// path is logged (console.warn) — no silent catches.
+//     it is served rather than dropping the reference rate.
+// Concurrent callers for the same token share one in-flight fetch.
 
 import { CG_IDS, CG_PLATFORM } from "./cgIds";
 
 const NATIVE = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const CG_BASE = "https://api.coingecko.com/api/v3";
+const LLAMA_BASE = "https://coins.llama.fi/prices/current";
 
 // Cache TTLs (ms).
 const FRESH_MS = 5 * 60_000; // positive price is fresh for 5 min
@@ -31,11 +34,10 @@ const NEG_MS = 2 * 60_000; //  "no price" result cached for 2 min
 // 10 min bounds that drift while still riding out realistic rate-limit bursts;
 // beyond it we prefer "no reference" (row hidden, gate inert) over a wrong one.
 const STALE_MS = 10 * 60_000; // positive price still servable on-error for 10 min
-const RETRY_AFTER_CAP_MS = 30_000; // honor Retry-After up to 30s
-const RETRY_AFTER_DEFAULT_MS = 1500; // 429 with no/garbage Retry-After
-// Circuit breaker: once a 429 survives the retry, stop calling CoinGecko for a
-// while. During a 429 storm every later ensurePrices() then goes straight to
-// stale-on-error / null instead of paying another retry wait per token.
+const FETCH_TIMEOUT_MS = 4_000; // hung CoinGecko must not block the quote render
+// Circuit breaker: once CoinGecko 429s / times out / 5xxs, stop calling it for
+// a while. Later ensurePrices() goes to DefiLlama / stale / null instead of
+// paying another wait per token.
 const COOLDOWN_MIN_MS = 60_000; // free tier resets per minute
 const COOLDOWN_MAX_MS = 5 * 60_000;
 
@@ -60,6 +62,24 @@ const WRAPPED_NATIVE: Record<number, string> = {
   57073: "0x4200000000000000000000000000000000000006",
 };
 
+// DefiLlama coin-key chain names (not CoinGecko platforms).
+const LLAMA_CHAIN: Record<number, string> = {
+  1: "ethereum",
+  10: "optimism",
+  56: "bsc",
+  100: "gnosis",
+  130: "unichain",
+  137: "polygon",
+  143: "monad",
+  999: "hyperliquid",
+  4663: "robinhood",
+  8453: "base",
+  9745: "plasma",
+  42161: "arbitrum",
+  43114: "avax",
+  57073: "ink",
+};
+
 type Entry = { usd: number | null; at: number };
 
 // Module-level, per-token caches. Never evicted — the map only ever holds the
@@ -67,8 +87,11 @@ type Entry = { usd: number | null; at: number };
 const cache = new Map<string, Entry>();
 const inflight = new Map<string, Promise<number | null>>();
 
-// Epoch ms until which CoinGecko is considered rate-limited (0 = not).
+// Epoch ms until which CoinGecko is considered unavailable (0 = not).
 let rateLimitedUntil = 0;
+
+let lastWarn = "";
+let lastWarnAt = 0;
 
 type Resolved = {
   key: string; // `${chainId}:${addrLower}`
@@ -103,77 +126,173 @@ function staleValue(key: string): number | null {
   return Date.now() - e.at <= STALE_MS ? e.usd : null;
 }
 
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
-function retryAfterMs(header: string | null): number {
-  if (!header) return RETRY_AFTER_DEFAULT_MS;
-  const secs = Number(header);
-  if (Number.isFinite(secs) && secs >= 0) {
-    return Math.min(secs * 1000, RETRY_AFTER_CAP_MS);
-  }
-  const when = Date.parse(header); // HTTP-date form
-  if (!Number.isNaN(when)) {
-    return Math.min(Math.max(when - Date.now(), 0), RETRY_AFTER_CAP_MS);
-  }
-  return RETRY_AFTER_DEFAULT_MS;
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-// Cooldown length after a persistent 429: at least a minute (free-tier reset
-// window), longer if Retry-After says so, never more than 5 min.
+function finiteUsd(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+function positiveUsd(v: unknown): number | null {
+  const n = finiteUsd(v);
+  return n != null && n > 0 ? n : null;
+}
+
+function errMsg(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+// One compact line; identical messages within 5s are dropped so a 3-token
+// batch doesn't print three copies (and never pass an Error — Bun dumps stacks).
+function warnOnce(msg: string): void {
+  const now = Date.now();
+  if (msg === lastWarn && now - lastWarnAt < 5_000) return;
+  lastWarn = msg;
+  lastWarnAt = now;
+  console.warn(msg);
+}
+
+// Cooldown length after a persistent CoinGecko failure: at least a minute
+// (free-tier reset window), longer if Retry-After says so, never more than 5 min.
 function cooldownMs(header: string | null): number {
   const secs = header ? Number(header) : NaN;
   const raw = Number.isFinite(secs) && secs >= 0 ? secs * 1000 : 0;
   return Math.min(Math.max(raw, COOLDOWN_MIN_MS), COOLDOWN_MAX_MS);
 }
 
-// Fetch with one 429 retry honoring Retry-After (capped). Throws on any non-OK
-// response (including a still-429 after the retry) so callers apply stale-on-error.
-// A surviving 429 also arms a cooldown: while it holds, calls throw immediately
-// without touching the network.
+function pauseCoinGecko(ms: number): void {
+  rateLimitedUntil = Math.max(rateLimitedUntil, Date.now() + ms);
+}
+
+// Fetch CoinGecko once. No retry: DefiLlama is the retry, and sleeping on
+// Retry-After used to freeze the CLI mid-quote. 429 / 5xx / timeout / network
+// error arm the cooldown so the rest of the run never touches CoinGecko again.
 async function cgFetch(url: string): Promise<Response> {
   const remaining = rateLimitedUntil - Date.now();
   if (remaining > 0) {
-    throw new Error(
-      `cgPrices: rate limited, backing off ${Math.ceil(remaining / 1000)}s more`,
-    );
+    throw new Error(`paused ${Math.ceil(remaining / 1000)}s`);
   }
-  let res = await fetch(url, { headers: { accept: "application/json" } });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+  } catch (e) {
+    pauseCoinGecko(COOLDOWN_MIN_MS);
+    throw new Error(errMsg(e));
+  }
   if (res.status === 429) {
-    const wait = retryAfterMs(res.headers.get("retry-after"));
-    console.warn(`cgPrices: 429 on ${url}; retrying once in ${wait}ms`);
-    await sleep(wait);
-    res = await fetch(url, { headers: { accept: "application/json" } });
+    pauseCoinGecko(cooldownMs(res.headers.get("retry-after")));
+    throw new Error("HTTP 429");
   }
-  if (res.status === 429) {
-    const cool = cooldownMs(res.headers.get("retry-after"));
-    rateLimitedUntil = Date.now() + cool;
-    console.warn(`cgPrices: still 429 after retry; pausing CoinGecko for ${cool}ms`);
+  if (res.status >= 500) {
+    pauseCoinGecko(COOLDOWN_MIN_MS);
+    throw new Error(`HTTP ${res.status}`);
   }
-  if (!res.ok) throw new Error(`cgPrices: HTTP ${res.status} on ${url}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res;
 }
 
-// One batched simple/price call for a set of coin ids → { id: usd|null }.
-async function fetchIdPrices(ids: string[]): Promise<Record<string, number | null>> {
-  const res = await cgFetch(
-    `${CG_BASE}/simple/price?ids=${encodeURIComponent(ids.join(","))}&vs_currencies=usd`,
-  );
-  const j = (await res.json()) as Record<string, { usd?: number }>;
+function readCgIdPrices(body: unknown, ids: string[]): Record<string, number | null> {
   const out: Record<string, number | null> = {};
-  for (const id of ids) out[id] = j[id]?.usd ?? null;
+  for (const id of ids) {
+    const row = isRecord(body) ? body[id] : undefined;
+    const usd = isRecord(row) ? finiteUsd(row.usd) : null;
+    out[id] = usd;
+  }
   return out;
 }
 
-// The per-contract fallback for a token without a known id.
+function readLlamaPrices(body: unknown): Map<string, number> {
+  const out = new Map<string, number>();
+  if (!isRecord(body) || !isRecord(body.coins)) return out;
+  for (const [key, row] of Object.entries(body.coins)) {
+    const usd = isRecord(row) ? positiveUsd(row.price) : null;
+    if (usd != null) out.set(key, usd);
+  }
+  return out;
+}
+
+async function llamaFetch(keys: string[]): Promise<Map<string, number>> {
+  if (keys.length === 0) return new Map();
+  const res = await fetch(`${LLAMA_BASE}/${keys.join(",")}`, {
+    headers: { accept: "application/json" },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return readLlamaPrices(await res.json());
+}
+
+// One batched simple/price call, falling back to DefiLlama coingecko:{id}.
+async function fetchIdPrices(ids: string[]): Promise<Record<string, number | null>> {
+  try {
+    const res = await cgFetch(
+      `${CG_BASE}/simple/price?ids=${encodeURIComponent(ids.join(","))}&vs_currencies=usd`,
+    );
+    return readCgIdPrices(await res.json(), ids);
+  } catch (e) {
+    const why = errMsg(e);
+    try {
+      const llama = await llamaFetch(ids.map((id) => `coingecko:${id}`));
+      const out: Record<string, number | null> = {};
+      let any = false;
+      for (const id of ids) {
+        const p = llama.get(`coingecko:${id}`) ?? null;
+        if (p != null) any = true;
+        out[id] = p;
+      }
+      if (any) {
+        warnOnce(`cgPrices: CoinGecko unavailable (${why}); using DefiLlama`);
+        return out;
+      }
+    } catch (e2) {
+      warnOnce(
+        `cgPrices: USD prices unavailable (CoinGecko: ${why}; DefiLlama: ${errMsg(e2)})`,
+      );
+      throw e;
+    }
+    warnOnce(`cgPrices: CoinGecko unavailable (${why}); DefiLlama had no prices`);
+    throw e;
+  }
+}
+
+// Per-contract fallback for a token without a known id: CoinGecko token_price,
+// then DefiLlama `{chain}:{address}`.
 async function fetchContractPrice(
+  chainId: number,
   platform: string,
   addr: string,
 ): Promise<number | null> {
-  const res = await cgFetch(
-    `${CG_BASE}/simple/token_price/${platform}?contract_addresses=${addr}&vs_currencies=usd`,
-  );
-  const j = (await res.json()) as Record<string, { usd?: number }>;
-  return j[addr]?.usd ?? null;
+  try {
+    const res = await cgFetch(
+      `${CG_BASE}/simple/token_price/${platform}?contract_addresses=${addr}&vs_currencies=usd`,
+    );
+    const j: unknown = await res.json();
+    const row = isRecord(j) ? j[addr] : undefined;
+    return isRecord(row) ? finiteUsd(row.usd) : null;
+  } catch (e) {
+    const why = errMsg(e);
+    const llamaChain = LLAMA_CHAIN[chainId];
+    if (llamaChain) {
+      try {
+        const llama = await llamaFetch([`${llamaChain}:${addr}`]);
+        const p = llama.get(`${llamaChain}:${addr}`) ?? null;
+        if (p != null) {
+          warnOnce(`cgPrices: CoinGecko unavailable (${why}); using DefiLlama`);
+          return p;
+        }
+      } catch (e2) {
+        warnOnce(
+          `cgPrices: USD prices unavailable (CoinGecko: ${why}; DefiLlama: ${errMsg(e2)})`,
+        );
+        throw e;
+      }
+    }
+    warnOnce(`cgPrices: CoinGecko unavailable (${why}); DefiLlama had no prices`);
+    throw e;
+  }
 }
 
 // Store a fetched price (positive or negative) and return it.
@@ -182,16 +301,15 @@ function commit(key: string, usd: number | null): number | null {
   return usd;
 }
 
-// Apply stale-on-error after a failed refresh: serve a ≤10-min-old positive
-// value (logged), else null.
-function onError(key: string, label: string, e: unknown): number | null {
-  console.warn(`cgPrices: ${label} failed for ${key}`, e);
+// After a failed refresh: serve a ≤10-min-old positive value, else cache a
+// negative so we don't re-hit DefiLlama on every quote refresh.
+function onError(key: string): number | null {
   const s = staleValue(key);
   if (s != null) {
-    console.warn(`cgPrices: serving stale (≤10m) price for ${key}`);
+    warnOnce("cgPrices: serving stale (≤10m) prices");
     return s;
   }
-  return null;
+  return commit(key, null);
 }
 
 // Ensure a USD price for each token, sharing one batched fetch for id-tokens and
@@ -236,8 +354,14 @@ async function ensurePrices(
       register(
         t.key,
         batch.then(
-          (map) => commit(t.key, map[t.cgId!] ?? null),
-          (e) => onError(t.key, "id batch", e),
+          (map) => {
+            const v = map[t.cgId!] ?? null;
+            if (v != null) return commit(t.key, v);
+            const s = staleValue(t.key);
+            if (s != null) return s;
+            return commit(t.key, null);
+          },
+          () => onError(t.key),
         ),
       );
     }
@@ -250,15 +374,15 @@ async function ensurePrices(
       t.key,
       (async () => {
         if (!platform) {
-          console.warn(
+          warnOnce(
             `cgPrices: no CoinGecko platform for chain ${chainId}; cannot price ${t.key}`,
           );
           return null;
         }
         try {
-          return commit(t.key, await fetchContractPrice(platform, t.addr));
-        } catch (e) {
-          return onError(t.key, "token_price", e);
+          return commit(t.key, await fetchContractPrice(chainId, platform, t.addr));
+        } catch {
+          return onError(t.key);
         }
       })(),
     );
@@ -312,6 +436,8 @@ export const __cgTest = {
     cache.clear();
     inflight.clear();
     rateLimitedUntil = 0;
+    lastWarn = "";
+    lastWarnAt = 0;
   },
   cooldownRemainingMs(): number {
     return Math.max(rateLimitedUntil - Date.now(), 0);
