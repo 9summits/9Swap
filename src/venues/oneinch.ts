@@ -19,6 +19,10 @@ const ONEINCH_SUPPORTED_CHAIN_IDS = new Set([
   // Robinhood (4663) — verified live 2026-07-02: /liquidity-sources lists
   // ROBINHOOD_* protocols and /quote returns real amounts.
   4663,
+  // HyperEVM (999) — verified live 2026-09-10: /liquidity-sources lists
+  // 13 HYPEREVM_* protocols (HyperSwap, Hybra, Curve Stable NG, KittenSwap,
+  // Ramses, …) and /quote + /swap return real amounts / calldata.
+  999,
 ]);
 
 type OneinchProtocol = {

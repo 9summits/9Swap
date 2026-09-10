@@ -110,3 +110,15 @@ test("1inch: hops beyond level 0 are flagged approxAmount", async () => {
   for (const h of level0) expect(h.approxAmount).toBeFalsy();
   expect(level1.approxAmount).toBe(true);
 });
+
+test("1inch: HyperEVM (999) is on the whitelist", async () => {
+  stubFetch({ dstAmount: "79964830", gas: 317762, protocols: [] });
+  const q = await oneinchQuote({
+    chain: resolveChain("hype"),
+    tokenIn: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    tokenOut: "0xb88339cb7199b77e23db6e890353e22632ba630f",
+    amountIn: 10n ** 18n,
+  });
+  expect(q.amountOut).toBe("79964830");
+  expect(q.venue).toBe("1inch");
+});

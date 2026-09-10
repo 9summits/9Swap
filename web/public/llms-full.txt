@@ -75,7 +75,7 @@ Native token is represented internally as the sentinel address `0xeeeeeeeeeeeeee
 | `kyber` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | · |
 | `velora` (sync) | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | · | · | · | ✓ | ✓ | · |
 | `matcha` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | ✓ | ✓ | · | ✓ |
-| `1inch` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | ✓ | ✓ | · |
+| `1inch` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · |
 | `curve` (sync) | ✓ | ✓ | ✓ | ✓ | · | · | ✓ | · | · | · | · | · | ✓ | · |
 | `uniswap` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | ✓ | · | ✓ |
 | `openocean` (sync) | ✓ | ✓ | ✓ | · | · | ✓ | ✓ | · | ✓ | · | · | ✓ | ✓ | · |
@@ -84,7 +84,7 @@ Native token is represented internally as the sentinel address `0xeeeeeeeeeeeeee
 | `delta` (intent) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | · | · | ✓ | · | · |
 | `uniswapx` (intent) | ✓ | ✓ | ✓ | · | ✓ | · | · | · | · | · | · | · | · | · |
 | `fusion` (intent) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | ✓ | ✓ | · |
-| *venues per chain* | 12 | 12 | 12 | 9 | 8 | 9 | 10 | 1 | 7 | 5 | 3 | 10 | 7 | 4 |
+| *venues per chain* | 12 | 12 | 12 | 9 | 8 | 9 | 10 | 2 | 7 | 5 | 3 | 10 | 7 | 4 |
 
 Venue availability depends on server env keys (e.g. `ZEROEX_API_KEY`, `ONEINCH_API_KEY`, `UNISWAP_API_KEY`; optional `KYBER_API_KEY` moves kyber to its higher-limit API gateway; optional `OPENOCEAN_API_KEY` moves openocean to its enterprise host) and `SWAP_DISABLE_VENUES` (production often disables `curve` because cold init is slow on serverless).
 
