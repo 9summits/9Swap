@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "summary": "Stateless quote / route / build endpoints behind swap.9summits.io and the local `swap` server.",
     "description": "Every endpoint is stateless: each call carries its full inputs, nothing is cached server-side, and `quoteId` is a client-side round key only. Amounts are **base units as decimal strings** (e.g. `\"1000000\"` for 1 USDC), never floats. Native gas token is the sentinel address `0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee`. The public host applies a per-IP token bucket per minute: `quote` bucket 60 (`/api/quote`, `/api/quote/stream`, `/api/route`), `build` bucket 12 (`/api/build`, `/assemble`), `submit` bucket 6 (`/submit`), `light` bucket 120 (everything else). Exceeding it returns HTTP 429 with a `Retry-After` header and body `{\"error\":\"rate limited, retry shortly\"}`. These calls consume the operator's venue API keys — cache responsibly and prefer the NDJSON stream for multi-venue races. Safety rules: never coerce `decimals` to 18; the ERC-20 approval target is `tx.spender`, not `tx.to`; use the same `slippageBps` for quote and build; never sign an order that was quoted with a placeholder sender.",
-    "license": { "name": "Apache-2.0", "url": "https://github.com/9summits/swap-cli/blob/main/LICENSE" },
+    "license": { "name": "Apache-2.0", "url": "https://github.com/9summits/9Swap/blob/main/LICENSE" },
     "contact": { "name": "9summits", "email": "contact@9summits.io", "url": "https://swap.9summits.io/" },
     "termsOfService": "https://swap.9summits.io/terms.html"
   },

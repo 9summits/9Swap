@@ -9,7 +9,7 @@ swap is a single product with two surfaces that share the same quote/build engin
 
 Supported chain aliases include `eth`, `arb`, `base`, `op`, `avax`, `bsc`, `hype`, `unichain`, `robinhood`, `monad`, `plasma`, `polygon`, `gnosis`, `ink`. Sync venues include KyberSwap, Odos, Velora, 0x/Matcha, 1inch, Curve, Uniswap Classic. Intent venues (CoW, Velora Delta, UniswapX, 1inch Fusion, and related) need an explicit async opt-in on the CLI (`--allow-async`) and appear in the dApp when enabled server-side.
 
-There is no separate marketing site, blog, or public pricing page. The SPA at `/` is the product UI. Source and contributor docs: https://github.com/9summits/swap-cli.
+There is no separate marketing site, blog, or public pricing page. The SPA at `/` is the product UI. Source and contributor docs: https://github.com/9summits/9Swap.
 
 ## For agents (start here)
 

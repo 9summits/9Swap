@@ -1,6 +1,6 @@
 # swap — CLI manual
 
-> Terminal CLI that races every major EVM DEX aggregator for a swap quote, ranks by token-out received, and optionally builds calldata, simulates, or hands the tx to a wallet. Single Bun-compiled binary. No daemon, no telemetry. Operator: 9summits. Source: https://github.com/9summits/swap-cli (Apache-2.0).
+> Terminal CLI that races every major EVM DEX aggregator for a swap quote, ranks by token-out received, and optionally builds calldata, simulates, or hands the tx to a wallet. Single Bun-compiled binary. No daemon, no telemetry. Operator: 9summits. Source: https://github.com/9summits/9Swap (Apache-2.0).
 
 HTML version: https://swap.9summits.io/docs · Machine index: https://swap.9summits.io/llms.txt · HTTP API: https://swap.9summits.io/openapi.json · Agent skill: https://swap.9summits.io/skills/swap-cli/SKILL.md
 

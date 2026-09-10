@@ -366,7 +366,7 @@ main() {
   No prebuilt binary for this platform, or the asset is missing from the current release store.
   Supported prebuilts: swap-darwin-arm64, swap-darwin-x64, swap-linux-arm64, swap-linux-x64
   Build from source (requires Bun):
-    git clone https://github.com/9summits/swap-cli.git && cd swap-cli && bun install && SWAP_PUBLIC_BUILD=1 ./build
+    git clone https://github.com/9summits/9Swap.git && cd 9Swap && bun install && SWAP_PUBLIC_BUILD=1 ./build
     install dist/swap ${INSTALL_DIR}/swap"
   fi
 

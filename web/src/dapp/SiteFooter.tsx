@@ -3,7 +3,7 @@ import { copyText } from "./copyText";
 import { Icon } from "./icons";
 
 const CONTACT_EMAIL = "contact@9summits.io";
-const GITHUB_URL = "https://github.com/9summits/swap-cli";
+const GITHUB_URL = "https://github.com/9summits/9Swap";
 // Static pages served from web/public — same origin as the deployed dApp.
 const DOCS_URL = "/docs.html";
 const TERMS_URL = "/terms.html";

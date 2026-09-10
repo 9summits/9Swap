@@ -10,7 +10,7 @@ import { InstallCliBar } from "./InstallCliBar";
 
 // dApp Header — ported from the swap prototype's <Header> + <ChainChip>
 // (/tmp/9s-design/ui_kits/swap/app.jsx). Left: the 9Summits "9" mark +
-// "swap-cli" wordmark. Center: install CLI pill (same row, never stacked above).
+// "9Swap" wordmark. Center: install CLI pill (same row, never stacked above).
 // Right: chain selector + wallet connect (RainbowKit).
 //
 // Self-contained: imports only RainbowKit + DS primitives + local helpers. The
@@ -479,7 +479,7 @@ export function Header({ chains, chain, onChain }: HeaderProps) {
           <BrandMark size={30} />
           <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <span style={s.brandWord}>swap-cli</span>
+              <span style={s.brandWord}>9Swap</span>
               <Badge tone="brand" variant="soft" size="sm" aria-label="Beta">
                 Beta
               </Badge>
