@@ -16,8 +16,8 @@ function isTimeoutLike(e: unknown): boolean {
   return name === "TimeoutError" || name === "AbortError";
 }
 
-function timeoutMessage(venue: string): string {
-  return `${venue}: timeout after ${getVenueTimeoutMs() / 1000}s`;
+function timeoutMessage(venue: string, ms: number): string {
+  return `${venue}: timeout after ${ms / 1000}s`;
 }
 
 export async function venueFetch(
@@ -32,13 +32,14 @@ export async function venueFetch(
 export async function withVenueTimeout<T>(
   venue: string,
   fn: () => Promise<T>,
+  timeoutMs?: number,
 ): Promise<T> {
-  const ms = getVenueTimeoutMs();
+  const ms = timeoutMs ?? getVenueTimeoutMs();
   const work = fn();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
-      const err = new Error(timeoutMessage(venue));
+      const err = new Error(timeoutMessage(venue, ms));
       err.name = "TimeoutError";
       reject(err);
     }, ms);
@@ -47,7 +48,7 @@ export async function withVenueTimeout<T>(
     return await Promise.race([work, timeout]);
   } catch (e) {
     void work.catch(() => {});
-    if (isTimeoutLike(e)) throw new Error(timeoutMessage(venue));
+    if (isTimeoutLike(e)) throw new Error(timeoutMessage(venue, ms));
     throw e;
   } finally {
     if (timer !== undefined) clearTimeout(timer);

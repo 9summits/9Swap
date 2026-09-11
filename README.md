@@ -121,7 +121,7 @@ Common flags:
 |------|--------|
 | `-a, --action <action>` | `swap` (default — quote + build) or `send` (transfer the input token to `--to`, no DEX) |
 | `--to <addr>` | recipient address; required with `-a send` |
-| `-v <venue>` | one of `kyber`, `odos`, `odosv2`, `velora`, `matcha`, `1inch`, `curve`, `uniswap`, `openocean`, `cow`, `delta`, `uniswapx`, `fusion`, `ophis`, or `all` (default `all`). Comma-separated list also works — e.g. `-v kyber,odos,matcha` races just those three and prints a 3-row comparison block. Bypassed entirely when `tokenIn`/`tokenOut` are the native↔wrapped pair (auto wrap/unwrap) or `-a send` |
+| `-v <venue>` | one of `kyber`, `odos`, `odosv2`, `velora`, `matcha`, `1inch`, `curve`, `electric`, `uniswap`, `openocean`, `cow`, `delta`, `uniswapx`, `fusion`, `ophis`, or `all` (default `all`). Comma-separated list also works — e.g. `-v kyber,odos,matcha` races just those three and prints a 3-row comparison block. `electric` is experimental (Curve-only, mainnet, needs the `erouter` CLI) and is **not** in `-v all`. Bypassed entirely when `tokenIn`/`tokenOut` are the native↔wrapped pair (auto wrap/unwrap) or `-a send` |
 | `--all` | alias for `-v all` (kept for muscle memory) |
 | `--allow-async` | include intent-based venues (`cow`, `delta`, `uniswapx`, `fusion`, `ophis`) — output is an EIP-712 order to sign + POST, not a tx |
 | `--chain <alias>` | `eth` (default), `arb`, `base`, `op`, `avax`, `bsc`, `hype`, `unichain`, `robinhood`, `monad`, `plasma`, `polygon`, `gnosis`, `ink` |

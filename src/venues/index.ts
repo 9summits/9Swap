@@ -33,6 +33,8 @@ import * as ophis from "./ophis.ts";
 import * as delta from "./delta.ts";
 import * as uniswapx from "./uniswapx.ts";
 import * as fusion from "./fusion.ts";
+import * as electric from "./electric.ts";
+import { ELECTRIC_TIMEOUT_MS } from "./electric.ts";
 
 export type { TradeSide } from "../trade_side.ts";
 
@@ -122,6 +124,7 @@ export function availableVenues(opts: {
   const buy = opts.side === "buy";
   return VENUES.filter((v) => {
     if (disabled.has(v)) return false;
+    if (v === "electric") return false;
     if (isDiscontinued(v)) return false;
     if (isAsyncVenue(v) && !opts.allowAsync) return false;
     const envVar = VENUE_ENV_VAR[v];
@@ -166,6 +169,9 @@ export function skippedVenues(opts: {
   for (const v of VENUES) {
     // Env-disabled venues are not "skipped" — they're absent entirely.
     if (disabled.has(v)) continue;
+    // electric is opt-in (`-v electric`); it is not a skip, just absent from
+    // the default race (cold erouter quotes are tens of seconds).
+    if (v === "electric") continue;
     // Same for a discontinued venue: there is no key to set, nothing to opt
     // into, so surfacing it as "skipped" would only be noise.
     if (isDiscontinued(v)) continue;
@@ -225,7 +231,7 @@ function resolveVenueList(opts: {
   const ready = availableVenues({ allowAsync: opts.allowAsync, side: opts.side });
   if (!opts.venues) return ready;
   const readySet = new Set(ready);
-  return opts.venues.filter((v) => readySet.has(v));
+  return opts.venues.filter((v) => readySet.has(v) || v === "electric");
 }
 
 // Shared quote request shape. `side` defaults to "sell" (exact-in). For
@@ -537,38 +543,46 @@ export async function fetchQuote(
     disableOdosRfq: params.disableOdosRfq,
   };
 
-  return withVenueTimeout(params.venue, async () => {
-    switch (params.venue) {
-      case "kyber":
-        return kyber.quote(adapterParams);
-      case "odos":
-        return odos.quote(adapterParams);
-      case "odosv2":
-        return odosv2.quote(adapterParams);
-      case "velora":
-        return velora.quote(adapterParams);
-      case "matcha":
-        return matcha.quote(adapterParams);
-      case "1inch":
-        return oneinch.quote(adapterParams);
-      case "curve":
-        return (await loadCurve()).quote(adapterParams);
-      case "uniswap":
-        return uniswap.quote(adapterParams);
-      case "openocean":
-        return openocean.quote(adapterParams);
-      case "cow":
-        return cow.quote(adapterParams);
-      case "ophis":
-        return ophis.quote(adapterParams);
-      case "delta":
-        return delta.quote(adapterParams);
-      case "uniswapx":
-        return uniswapx.quote(adapterParams);
-      case "fusion":
-        return fusion.quote(adapterParams);
-    }
-  });
+  const timeoutMs =
+    params.venue === "electric" ? ELECTRIC_TIMEOUT_MS : undefined;
+  return withVenueTimeout(
+    params.venue,
+    async () => {
+      switch (params.venue) {
+        case "kyber":
+          return kyber.quote(adapterParams);
+        case "odos":
+          return odos.quote(adapterParams);
+        case "odosv2":
+          return odosv2.quote(adapterParams);
+        case "velora":
+          return velora.quote(adapterParams);
+        case "matcha":
+          return matcha.quote(adapterParams);
+        case "1inch":
+          return oneinch.quote(adapterParams);
+        case "curve":
+          return (await loadCurve()).quote(adapterParams);
+        case "electric":
+          return electric.quote(adapterParams);
+        case "uniswap":
+          return uniswap.quote(adapterParams);
+        case "openocean":
+          return openocean.quote(adapterParams);
+        case "cow":
+          return cow.quote(adapterParams);
+        case "ophis":
+          return ophis.quote(adapterParams);
+        case "delta":
+          return delta.quote(adapterParams);
+        case "uniswapx":
+          return uniswapx.quote(adapterParams);
+        case "fusion":
+          return fusion.quote(adapterParams);
+      }
+    },
+    timeoutMs,
+  );
 }
 
 /**
@@ -632,6 +646,8 @@ export async function build(
       return { kind: "tx", ...(await oneinch.buildTx(p)) };
     case "curve":
       return { kind: "tx", ...(await (await loadCurve()).buildTx(p)) };
+    case "electric":
+      return { kind: "tx", ...(await electric.buildTx(p)) };
     case "uniswap":
       return uniswap.buildTx(p);
     case "openocean":

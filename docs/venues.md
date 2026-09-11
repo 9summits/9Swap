@@ -34,7 +34,7 @@ a `buildTx(params)`. Each adapter is responsible for:
 > reference and still compile — flip the flag to re-enable them.
 
 Sync vs. async: **sync** venues (`kyber`, `odos`, `odosv2`, `velora`, `matcha`,
-`1inch`, `uniswap`, `curve`, `openocean`) return a `NormalizedTx` (`kind: "tx"`);
+`1inch`, `uniswap`, `curve`, `electric`, `openocean`) return a `NormalizedTx` (`kind: "tx"`);
 **async** venues (`cow`, `delta`, `uniswapx`, `fusion`, `ophis`) return a
 `NormalizedOrder` (`kind: "order"`). Uniswap can additionally return a `NormalizedPermitTx`
 (`kind: "permit-tx"`) — see [below](#permit-tx-buildresult-kind).
@@ -127,6 +127,14 @@ Sync vs. async: **sync** venues (`kyber`, `odos`, `odosv2`, `velora`, `matcha`,
   ETH on either side is handled inside curve-js — both `0xeee…eee` (KyberSwap
   sentinel) and `0x000…000` (Odos / curve-js sentinel) are accepted on input;
   `normalizeNative` collapses both back to `0xeee…eee` for our hops display.
+
+- **Electric** (experimental, CLI-only) — Curve-only split router from
+  [michwill/electric-router](https://github.com/michwill/electric-router). Not
+  in `-v all` or the dApp list; opt in with `-v electric` or `-v curve,electric`.
+  Ethereum mainnet only. Quote/build spawn the `erouter` CLI (`EROUTER_BIN`,
+  optional `EROUTER_CWD` for the checkout's `data/` caches). Timeout 180s.
+  Spender is ElectricRouter (`0xf5438daf…979e`), not Curve RouterNG. AGPL-3.0
+  solver is not vendored.
 
 ### curve-js noise containment
 

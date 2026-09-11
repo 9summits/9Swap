@@ -50,6 +50,7 @@ src/
     uniswapx.ts     UniswapX Dutch orders — async, needs UNISWAP_API_KEY
     fusion.ts       1inch Fusion (Dutch auction) — async, reuses ONEINCH_API_KEY
     curve.ts        Curve Finance — on-chain (curve-js); quote returns null gas
+    electric.ts     experimental Curve-only split router (erouter CLI, mainnet, opt-in)
     uniswap.ts      Uniswap classic (v2/v3/v4) — Trading API + SwapRouter02/V2Router02 fast path + Path A
   simulate.ts       --simulate impl: state-override RPC prank → approve + swap via eth_simulateV1
   browser.ts        --browser impl: Bun.serve() local UI bridge; /tx, /assemble, /simulate, /submit, /done

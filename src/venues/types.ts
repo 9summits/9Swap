@@ -1,11 +1,11 @@
 import { BUY_CAPABLE_VENUES } from "../trade_side.ts";
 
-export type SyncVenue = "kyber" | "odos" | "odosv2" | "velora" | "matcha" | "1inch" | "curve" | "uniswap" | "openocean";
+export type SyncVenue = "kyber" | "odos" | "odosv2" | "velora" | "matcha" | "1inch" | "curve" | "electric" | "uniswap" | "openocean";
 export type AsyncVenue = "cow" | "delta" | "uniswapx" | "fusion" | "ophis";
 export type Venue = SyncVenue | AsyncVenue;
 export type VenueOption = Venue | "all";
 
-export const SYNC_VENUES: SyncVenue[] = ["kyber", "odos", "odosv2", "velora", "matcha", "1inch", "curve", "uniswap", "openocean"];
+export const SYNC_VENUES: SyncVenue[] = ["kyber", "odos", "odosv2", "velora", "matcha", "1inch", "curve", "electric", "uniswap", "openocean"];
 export const ASYNC_VENUES: AsyncVenue[] = ["cow", "delta", "uniswapx", "fusion", "ophis"];
 export const VENUES: Venue[] = [...SYNC_VENUES, ...ASYNC_VENUES];
 export const VENUE_OPTIONS: VenueOption[] = [...VENUES, "all"];
