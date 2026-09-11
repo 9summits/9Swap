@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
+import { existsSync } from "node:fs";
 import { unlink } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import type { ChainInfo } from "../chains.ts";
 import { getRpcUrl } from "../rpc.ts";
@@ -207,20 +208,51 @@ function estimateGasUnits(legs: ErouterLeg[]): number {
   return total;
 }
 
+function defaultCheckout(): string {
+  return join(homedir(), "git/electric-router");
+}
+
+function resolveCwd(): string | undefined {
+  const env = process.env.EROUTER_CWD?.trim();
+  if (env) return env;
+  const home = defaultCheckout();
+  if (existsSync(join(home, "pyproject.toml"))) return home;
+  return undefined;
+}
+
 function resolveBin(): string {
   const raw = process.env.EROUTER_BIN?.trim();
   if (raw) return raw;
   const found = Bun.which("erouter");
   if (found) return found;
+  const cwd = resolveCwd();
+  for (const p of [
+    cwd ? join(cwd, ".venv/bin/erouter") : "",
+    join(defaultCheckout(), ".venv/bin/erouter"),
+  ]) {
+    if (p && existsSync(p)) return p;
+  }
   throw new Error(
     "electric: erouter not found — set EROUTER_BIN to the electric-router CLI (https://github.com/michwill/electric-router)",
   );
 }
 
-function tail(text: string, max = 1500): string {
-  const trimmed = text.trim();
-  if (trimmed.length <= max) return trimmed;
-  return trimmed.slice(trimmed.length - max);
+function summarizeFail(stdout: string, stderr: string, exitCode: number): string {
+  const lines = `${stderr}\n${stdout}`
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const hit = [...lines]
+    .reverse()
+    .find(
+      (l) =>
+        l.includes("✘") ||
+        /error/i.test(l) ||
+        l.includes("failed") ||
+        l.includes("no route"),
+    );
+  const snippet = hit ?? (lines.slice(-2).join(" | ") || `exit ${exitCode}`);
+  return `electric: erouter failed (exit ${exitCode}): ${snippet}`;
 }
 
 async function spawnErouter(
@@ -239,7 +271,7 @@ async function spawnErouter(
     tmpdir(),
     `erouter-${Date.now()}-${randomBytes(4).toString("hex")}.json`,
   );
-  const cwd = process.env.EROUTER_CWD?.trim() || undefined;
+  const cwd = resolveCwd();
   const args = [
     "route",
     "--from",
@@ -261,6 +293,11 @@ async function spawnErouter(
     "--no-color",
     "--ascii",
   ];
+  // Local EVM needs the compiled `erouter_evm` extension (not installed by
+  // `uv sync`). Without it erouter exits 4 rather than falling back. Wire
+  // quotes are slower and not identical; set EROUTER_LOCAL=1 once the
+  // extension is built (`uv pip install ./rust/evm`).
+  if (process.env.EROUTER_LOCAL !== "1") args.push("--no-local");
   const proc = Bun.spawn([bin, ...args], {
     cwd,
     stdout: "pipe",
@@ -284,11 +321,10 @@ async function spawnErouter(
     } finally {
       await unlink(jsonPath).catch(() => {});
     }
-    const detail = tail(stderr) || tail(stdout) || `exit ${exitCode}`;
     if (exitCode !== 0) {
-      throw new Error(`electric: erouter failed (exit ${exitCode}): ${detail}`);
+      throw new Error(summarizeFail(stdout, stderr, exitCode));
     }
-    throw new Error(`electric: erouter wrote no JSON: ${detail}`);
+    throw new Error(`electric: erouter wrote no JSON (${summarizeFail(stdout, stderr, exitCode)})`);
   } finally {
     clearTimeout(killer);
   }
