@@ -134,7 +134,7 @@ Sync vs. async: **sync** venues (`kyber`, `odos`, `odosv2`, `velora`, `matcha`,
   Ethereum mainnet only. Quote/build spawn the `erouter` CLI (`EROUTER_BIN`,
   optional `EROUTER_CWD` for the checkout's `data/` caches). Timeout 180s.
   Spender is ElectricRouter (`0xf5438daf…979e`), not Curve RouterNG. AGPL-3.0
-  solver is not vendored.
+  solver is not vendored. Install: [electric.md](electric.md).
 
 ### curve-js noise containment
 

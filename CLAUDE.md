@@ -55,6 +55,7 @@ web/                 Vite + React + RainbowKit dApp (separate package)
 - [docs/vercel.md](docs/vercel.md) — serverless deployment steps and env vars.
 - [docs/quote-accuracy.md](docs/quote-accuracy.md) — quote vs. execution accuracy
   investigation for sync venues.
+- [docs/electric.md](docs/electric.md) — install the `erouter` CLI for `-v electric`.
 - [test.md](test.md) — typecheck, unit tests, offline self-checks, and the
   Playwright e2e battery (one test per venue against the real dApp).
 
