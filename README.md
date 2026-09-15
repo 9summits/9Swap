@@ -40,9 +40,15 @@ swap update          # pull the latest public prebuilt (no-op when already curre
 swap 100 USDC WETH
 ```
 
-First run may prompt for an Alchemy key / RPC URL (saved under `~/.swap`).
-If `~/.local/bin` is not on your `PATH`, the installer prints the line to add
-to your shell profile.
+The installed binary is **hosted by default**: it quotes and builds through
+`https://swap.9summits.io/api/*` (`--hosted`), so every venue works with zero
+key configuration and no RPC, except `--simulate`. Pass `--local` (or clear
+`SWAP_API_URL`) to switch to the local engine with your own venue keys and
+RPC.
+
+First run may prompt for an Alchemy key / RPC URL (saved under `~/.swap`) if
+the command you ran needs one. If `~/.local/bin` is not on your `PATH`, the
+installer prints the line to add to your shell profile.
 
 **Note:** the CLI binary is `swap` (config still under `~/.swap`). A short-lived
 `swag` rename was reverted — reinstall with the one-liner above if you still
@@ -133,6 +139,8 @@ Common flags:
 | `--browser` | open a local RainbowKit page to connect a wallet and send/sign — covers sync tx, async orders, and Uniswap V4 / split / mixed routes (Permit2 sign-then-assemble). Mutually exclusive with `--json` and `--simple` |
 | `--json` | structured machine-readable output |
 | `-s`, `--simple` | print only the numeric `amountOut` for shell piping |
+| `--hosted` | quote and build through the hosted API (`https://swap.9summits.io`) for this run instead of the local engine; no venue key, no RPC except `--simulate`; mutually exclusive with `--local` |
+| `--local` | force the local engine for this run even when `SWAP_API_URL` is set, using your own venue keys and RPC |
 
 ## Output modes
 
@@ -231,7 +239,9 @@ chain tables (`*_SUPPORTED_CHAIN_IDS` / chain maps in `src/venues/*.ts`).
 | `fusion` (intent) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | ✓ | ✓ | · |
 | *venues per chain* | 12 | 12 | 12 | 9 | 8 | 9 | 10 | 2 | 7 | 5 | 3 | 10 | 7 | 4 |
 
-API keys (place in `.env`, `cp .env.example .env` to start):
+API keys below are only needed with `--local` (self-host, your own venue
+keys); the default hosted mode already has every key-gated venue enabled
+server-side. Place them in `.env`, `cp .env.example .env` to start:
 
 | Venue | Env var | Free signup |
 |-------|---------|-------------|
@@ -290,10 +300,39 @@ quote wire.
 | `uniswapx` | ♻️ refine | sell-only; needs `--allow-async` |
 | `fusion` | ♻️ refine | sell-only; needs `--allow-async` |
 
+## Hosted mode
+
+By default `swap` quotes and builds through `https://swap.9summits.io/api/*`
+instead of the local venue engine: no venue key and no RPC needed for a plain
+quote or a `-d` build, and every key-gated venue (1inch, Fusion, Matcha/0x,
+Uniswap, UniswapX) works out of the box. `--simulate` and the local-only
+actions (`send`, `unwrapwrseth`, `withdrawsparkweth`, `unstakesavax`,
+`claimsavax`) still run against your own RPC.
+
+Resolution order: `--local` > `--hosted` > `SWAP_API_URL` > local engine. The
+public prebuilt binary embeds `SWAP_API_URL=https://swap.9summits.io`. To
+self-host with your own venue keys and RPC, pass `--local` for one run, or
+clear `SWAP_API_URL` (unset it in the shell, `.env`, or `~/.swap/config`).
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `SWAP_API_URL` | `https://swap.9summits.io` (baked into the public binary) | Base URL of a `/api/*` deployment the CLI quotes and builds through. Empty/unset disables hosted mode |
+
+In hosted mode `--nofee` is refused (fee policy is server-side), the venue
+list comes from `GET /api/mode` (`curve` is not offered there), and a stale
+binary whose `apiVersion` no longer matches the deployment fails with
+`hosted API contract mismatch … run swap update`. The CLI never falls back to
+the local engine silently: an unreachable or rate-limited API fails loud and
+points at `--local`. No telemetry is added (the CLI still never calls a
+`/done` endpoint), but the hosted server does see the caller's IP, the pair,
+the amounts, and the `--from` address on a build, the same as the web dApp.
+
 ## RPC
 
 `-d` / `--simulate` need RPC access for allowance reads, gas-price lookups,
-and `eth_simulateV1`. Resolution order:
+and `eth_simulateV1` when running against the local engine (`--local` or
+`SWAP_API_URL` unset). Hosted mode needs none of that for a plain quote or
+build; only `--simulate` still calls your own RPC. Resolution order:
 
 1. `RPC_URL_<chainId>` (e.g. `RPC_URL_1`)
 2. `<ALIAS>_RPC_URL` (e.g. `ETH_RPC_URL`, `ARB_RPC_URL`)
@@ -407,6 +446,10 @@ The bundle is embedded in the binary at build time (`web/` source → vite-singl
 → `web/dist/index.html` → text-imported by `src/browser.embedded.ts`). Optional
 `WALLETCONNECT_PROJECT_ID` env var enables WalletConnect; without it only
 injected wallets work, which is enough for most setups.
+
+`--browser` also works in hosted mode: the tx/order is built through the
+hosted API and the local bridge server proxies the `/assemble` and `/submit`
+legs to it, so nothing is signed anywhere but your own browser.
 
 ## Architecture
 

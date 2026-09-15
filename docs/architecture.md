@@ -55,6 +55,7 @@ src/
   browser.ts        --browser impl: Bun.serve() local UI bridge; /tx, /assemble, /simulate, /submit, /done
   browser.embedded.ts  text-imports web/dist/index.html (vite singlefile) at build time
   core.ts           commander-free composition layer over the primitives (shared by the server handlers)
+  remote.ts         hosted mode (`--hosted` / `--local` / `SWAP_API_URL`): `/api/*` client that replaces the local venue engine for quote + build, and the wire → NormalizedQuote mapping
   server/
     handlers.ts     STATELESS request handlers for every dApp endpoint (Web Fetch API only, no Bun.*)
     shared.ts       Bun-free helpers extracted out of browser.ts (Payload types, rewriteAuthedOrderSubmit, proxyOrderSubmit)
@@ -95,6 +96,62 @@ are in [venues.md](./venues.md#venue-adapter-contract).
    gross; only order and ★ change.
 3. **Build** — with `-d`, the winner's venue is called a second time to assemble
    an executable transaction (see [Tx build](#tx-build--d--data)).
+
+## Hosted mode
+
+`src/remote.ts` is the `--hosted` / `--local` client: when it resolves a
+non-null API base, `-a swap` runs against that deployment's `/api/*` instead
+of the local venue engine. `resolveApiBase()` precedence: `--local` beats
+`--hosted` (`HOSTED_DEFAULT = https://swap.9summits.io`) beats the
+`SWAP_API_URL` env var (read after `loadDotenv()`, so a value baked into
+`.env.install` wins for the public binary unless a shell export overrides
+it) beats the local engine.
+
+What moves to the API in hosted mode: `remoteResolveToken` /
+`remoteResolveAddresses` replace `resolveToken` / `resolveAddresses`
+(`POST /api/resolve-token`); `remoteMode()` hits `GET /api/mode` once per
+run, checks `apiVersion` against the CLI's own `API_VERSION`
+(`src/server/shared.ts`) and throws "hosted API contract mismatch … run
+`swap update`" on any mismatch, then supplies the venue/chain list used in
+place of the local adapter tables; `remoteQuoteStream` (`POST
+/api/quote/stream`, NDJSON) and `remoteQuoteAll` (`POST /api/quote`) replace
+`fetchAllQuotesStream` / `fetchAllQuotes`, yielding the same `VenueResult[]`
+the renderers already consume; `remoteBuild` (`POST /api/build`) replaces
+`build()`, and its `approval` field replaces the local allowance `eth_call`
+so `-d` needs no RPC either. The Permit2 second leg (`remoteAssemble`,
+`POST /assemble`) and async-order submit URLs (`remoteSubmitUrl`) are
+rewritten the same way for `--browser`, whose local bridge proxies
+`/assemble` and `/submit` to the hosted base instead of handling them
+itself (see [dapp.md](./dapp.md)).
+
+What stays local even when hosted: `--simulate` (`eth_simulateV1` always
+runs against the caller's own RPC) and the actions that build their own
+calldata and read the chain directly (`-a send`, `unwrapwrseth`,
+`withdrawsparkweth`, `unstakesavax`, `claimsavax`; see
+[Actions & short-circuits](#actions--short-circuits)). `resolveApiBase()`
+only gates `-a swap`; the orchestrator in `src/index.ts` sets a
+`hostedLocalActionNote` for the other actions so a resulting
+`RpcConfigError` explains why an RPC is still being asked for.
+
+The wire to `NormalizedQuote` mapping lives in `routeQuoteToNormalized`
+(`src/remote.ts`): it tolerates a deployment that predates the
+`hops`/`router`/`protocolFee`/`tokenHints` wire additions (empty route
+tree, `router: null`, rather than crashing), never trusts a wire `decimals`
+it cannot validate (`assertDecimals`, range `[0, 36]`, see
+[conventions.md](./conventions.md#decimals-are-safety-critical)), and
+rebuilds the `buyRefine` object client-side from data the CLI already holds
+(the wire only carries a boolean) instead of trusting anything sent back.
+`venueResultsFromNdjson` decodes the streaming response into the same
+`VenueResult` events as the local `fetchAllQuotesStream`, including a route
+split across two network chunks.
+
+The CLI never signs in hosted mode, same as local: it only renders what the
+API returns. `--nofee` is refused when hosted (fee policy is server-side);
+the only extra output is a stderr line, `hosted  quotes and tx build via
+<base>`. Offline coverage lives in `tests/hosted_mode.test.ts`: it stubs
+`fetch` and exercises base resolution, the wire mapping, the NDJSON reader
+(split chunk boundaries included), and the 429 / network / contract-mismatch
+error paths.
 
 ## Output modes
 

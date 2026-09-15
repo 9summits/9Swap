@@ -14,10 +14,16 @@ This file expands [/llms.txt](https://swap.9summits.io/llms.txt) with enough det
 ## Agent quickstart
 
 1. Read https://swap.9summits.io/docs.md (CLI manual) or install the skill at https://swap.9summits.io/skills/swap-cli/SKILL.md.
-2. Install: `curl -fsSL https://swap.9summits.io/install.sh | bash` (macOS/Linux, arm64/x64; binary in `~/.local/bin`).
-3. Configure through env only: `ALCHEMY_API_KEY` (or `RPC_URL_<chainId>`), `SENDER_ADDRESS`, optional venue keys. The CLI never prompts when stdin/stderr is not a TTY; `--init` exits 1 instead of hanging.
+2. Install: `curl -fsSL https://swap.9summits.io/install.sh | bash` (macOS/Linux, arm64/x64; binary in `~/.local/bin`). The binary is **hosted by default** (`SWAP_API_URL=https://swap.9summits.io` baked in): it quotes and builds through this host's `/api/*`, so every venue works with zero key configuration and no RPC except `--simulate`.
+3. Configure through env only, and only if self-hosting with `--local`: `ALCHEMY_API_KEY` (or `RPC_URL_<chainId>`), `SENDER_ADDRESS`, optional venue keys. The CLI never prompts when stdin/stderr is not a TTY; `--init` exits 1 instead of hanging.
 4. Quote with `swap 1 WBTC ETH --json`; build with `--from 0x… -d --json`; dry-run with `--simulate`. Exit code 0 on success, 1 on any error (`{"error": "…"}` on stdout under `--json`, message on stderr).
 5. Prefer the binary. If you must call HTTP, the contract is in https://swap.9summits.io/openapi.json — public host or the local `swap` server (`SWAP_NO_AUTH=1` to drop the `?id=` gate, `NO_BROWSER_OPEN=1` on headless machines).
+
+## Hosted mode (CLI)
+
+The `swap` CLI resolves its backend in this order: `--local` > `--hosted` > `SWAP_API_URL` env var > local engine. `--hosted` forces this host (`https://swap.9summits.io`) for one run; `--local` forces the local venue engine (the user's own keys and RPC) even when `SWAP_API_URL` is set. The public prebuilt binary embeds `SWAP_API_URL=https://swap.9summits.io`, so it is hosted unless the user opts out.
+
+In hosted mode the CLI never signs anything (unchanged from local mode): it renders whatever the API returns. `--nofee` is refused (fee policy is server-side, not the client's to zero); the venue list is whatever `GET /api/mode` reports (this host omits `curve`); a `GET /api/mode.apiVersion` mismatch with the CLI's expected version fails with "hosted API contract mismatch … run `swap update`" rather than degrading silently. `--simulate` and the local-only actions (`send`, `unwrapwrseth`, `withdrawsparkweth`, `unstakesavax`, `claimsavax`) always run against the caller's own RPC, hosted or not. A rate-limited (429) or unreachable API fails loud, naming `--local` as the escape hatch, never falling back silently.
 
 ## Surfaces
 
@@ -195,6 +201,8 @@ There is **no** public `/api/balances` — balances are read client-side via the
 | `--json` | Machine-readable output |
 | `-s` / `--simple` | Print only the numeric variable leg |
 | `-a send` | Transfer instead of swap |
+| `--hosted` | Quote and build through this host's `/api/*` for this run, no venue key or RPC needed except `--simulate` |
+| `--local` | Force the local venue engine for this run even if `SWAP_API_URL` is set |
 
 ## Safety rules agents should respect
 

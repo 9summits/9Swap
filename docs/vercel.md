@@ -46,6 +46,8 @@ Set these in **Project → Settings → Environment Variables**:
 
 The Vercel deployment has **no session gate** (unlike the local `swap` CLI which guards every endpoint with a `?id=` token). Any visitor who can reach the deployment URL will trigger API calls that consume your keys' quotas.
 
+The public `swap` CLI binary is now itself a client of this API by default (`--hosted` / `SWAP_API_URL`, see `src/remote.ts` and [architecture.md](./architecture.md#hosted-mode)): every `curl | bash` install quotes and builds through this deployment unless the user passes `--local`. Budget venue-key quotas for CLI traffic, not just dApp visitors, when sizing the deployment. The CLI enforces `GET /api/mode.apiVersion === 1` before doing anything else and refuses to run on a mismatch, so `apiVersion` in `src/server/shared.ts` must stay at `1` for as long as the wire contract (`/api/quote`, `/api/quote/stream`, `/api/build`, `/api/mode`, `/api/resolve-token` response shapes) stays backward compatible; bump it only alongside a breaking change, since every already-installed hosted binary starts failing loud (pointing at `swap update`) the moment it does.
+
 ### In-code rate limiting
 
 `src/server/ratelimit.ts` applies a per-IP token bucket to `api/*.ts` wrappers

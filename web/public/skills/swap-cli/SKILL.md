@@ -5,7 +5,7 @@ description: Get the best DEX swap quote on EVM chains (Ethereum, Base, Arbitrum
 
 # swap — DEX meta-aggregator CLI
 
-Single binary `swap`. Quotes need no configuration; building or simulating a tx needs an RPC key. Full manual: https://swap.9summits.io/docs.md · HTTP API: https://swap.9summits.io/openapi.json
+Single binary `swap`, **hosted by default**: it quotes and builds through `https://swap.9summits.io/api/*`, so no venue key and no RPC are needed except for `--simulate`. Full manual: https://swap.9summits.io/docs.md · HTTP API: https://swap.9summits.io/openapi.json
 
 ## Install (once)
 
@@ -16,14 +16,18 @@ export PATH="$HOME/.local/bin:$PATH"
 
 macOS / Linux, arm64 + x64. `swap update` upgrades in place.
 
+## Hosted vs. local
+
+The public binary embeds `SWAP_API_URL=https://swap.9summits.io`, so it runs hosted out of the box: quotes and builds go through that API, nothing is signed remotely, and every key-gated venue (1inch, Fusion, Matcha/0x, Uniswap, UniswapX) is already enabled. Pass `--hosted` to force it for one run, or `--local` to force the local engine (self-hosted, your own keys and RPC) even when `SWAP_API_URL` is set; the two flags are mutually exclusive. `--nofee` is **refused in hosted mode** (fee policy is server-side); use `--local` if a fee-free run matters. `--simulate` and the local-only actions (`send`, `unwrapwrseth`, `withdrawsparkweth`, `unstakesavax`, `claimsavax`) always call the caller's own RPC, hosted or not.
+
 ## Configure through the environment, never through prompts
 
-The CLI never blocks on stdin when it is not a TTY. Set what you need:
+The CLI never blocks on stdin when it is not a TTY. This only matters for `--local` / self-hosting; the hosted default needs none of it:
 
 ```sh
-export ALCHEMY_API_KEY=…        # one key, every chain; needed for -d / --simulate / max / curve
+export ALCHEMY_API_KEY=…        # one key, every chain; needed for -d / --simulate / max / curve in local mode
 export SENDER_ADDRESS=0x…       # default --from
-# optional venue keys: ZEROEX_API_KEY (matcha), ONEINCH_API_KEY (1inch, fusion), UNISWAP_API_KEY (uniswap, uniswapx), KYBER_API_KEY (kyber gateway, higher limits), OPENOCEAN_API_KEY (openocean enterprise host)
+# optional venue keys (local mode only): ZEROEX_API_KEY (matcha), ONEINCH_API_KEY (1inch, fusion), UNISWAP_API_KEY (uniswap, uniswapx), KYBER_API_KEY (kyber gateway, higher limits), OPENOCEAN_API_KEY (openocean enterprise host)
 ```
 
 Or `RPC_URL_<chainId>` (e.g. `RPC_URL_1`) for a specific RPC. Missing RPC config is a hard error that names the variable to set. The CLI has no public-RPC fallback (the hosted dApp last-resorts to PublicNode when Alchemy is unset).
@@ -64,4 +68,4 @@ swap 100 USDC USDT --from 0x… -d --json | jq '{spender: .tx.spender, to: .tx.t
 4. **Intent venues (`--allow-async`) output an order to sign, not a tx.** Sign `order.typedData` with the real sender and POST to `order.submit.url`.
 5. **Prefer `--simulate` before broadcasting** anything larger than dust; it reports the tokenOut actually received.
 6. `--json` and `--browser` are mutually exclusive. Use `--browser` when a human must sign; use `-d --json` when you hold a signer.
-7. The public host https://swap.9summits.io exposes the same `/api/*` endpoints (rate limited per IP: 60 quote-class, 12 build, 6 submit calls per minute). Use them for quotes when the binary is unavailable; they spend the operator's venue keys, so cache.
+7. The public host https://swap.9summits.io exposes the same `/api/*` endpoints the hosted binary already talks to (rate limited per IP: 60 quote-class, 12 build, 6 submit calls per minute). Call them directly only when the binary is unavailable; they spend the operator's venue keys, so cache.

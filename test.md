@@ -9,6 +9,7 @@ All commands run from the repo root. Bun is required.
 | Typecheck       | `bun run typecheck`                   | no                  |
 | Unit            | `bun run test` (or `bun test tests/*.test.ts`) | no           |
 | Self-checks     | `bun run web/src/dapp/urlState.ts` · `bun run src/venues/ophis.ts` | no |
+| Hosted smoke    | `SWAP_API_URL=http://127.0.0.1:5152 bun run src/index.ts …`     | no external network (local `vercel-smoke.ts`) |
 | E2E dApp        | `bun run test:e2e`                    | yes (`.env` filled in)  |
 
 ## Typecheck
@@ -22,7 +23,16 @@ bun run typecheck      # tsc --noEmit on the whole project
 ```bash
 bun run test                     # all unit tests (tests/*.test.ts)
 bun test tests/hops_approx.test.ts   # a single file
+bun test tests/hosted_mode.test.ts   # hosted mode (--hosted / --local / SWAP_API_URL) offline unit tests
 ```
+
+`tests/hosted_mode.test.ts` stubs `fetch` and covers `src/remote.ts` end to
+end without a network call: `resolveApiBase` precedence
+(`--local` > `--hosted` > `SWAP_API_URL` > local engine), the wire to
+`NormalizedQuote` mapping (`routeQuoteToNormalized`), the NDJSON stream
+reader (`venueResultsFromNdjson`, including a line split across chunk
+boundaries), the `apiVersion` mismatch check, and the 429 / unreachable-API
+error messages.
 
 ⚠️ Do not run `bun test` **without an argument**: Bun's runner also picks up
 the Playwright specs (`tests/e2e/*.spec.ts`) and crashes (two incompatible
@@ -35,6 +45,27 @@ bun run web/src/dapp/urlState.ts   # deep-link router round-trip → "urlState s
 bun run web/src/dapp/iconCache.ts  # icon key / persistable-URL checks → "iconCache self-check: OK"
 bun run src/venues/ophis.ts        # canonical appData + eth-flow calldata → "ophis self-check: OK"
 ```
+
+## Hosted mode smoke (`--hosted` / `SWAP_API_URL` against a real API shape)
+
+`tests/hosted_mode.test.ts` covers `src/remote.ts` offline, but it stubs
+`fetch`: it never exercises the CLI against an actual `/api/*` response
+shape. For that, point the CLI at the same local `vercel-smoke.ts` server
+used for the Vercel smoke test (see [docs/vercel.md](docs/vercel.md#local-test-before-deploying)):
+
+```bash
+SWAP_DISABLE_VENUES=curve bun run scripts/vercel-smoke.ts &
+sleep 2
+
+SWAP_API_URL=http://127.0.0.1:5152 bun run src/index.ts 2000 weth steth -v all
+
+kill %1  # stop the smoke server
+```
+
+Check every row of the comparison table: this is the same command used as
+the CLI's general pre-release smoke test, run once against the local engine
+and once against `vercel-smoke.ts` through `SWAP_API_URL` to confirm the
+hosted client reads the live wire shape correctly.
 
 ## E2E — interactive dApp (Playwright)
 
