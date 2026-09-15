@@ -5,6 +5,7 @@ import { loadDotenv, maybePromptForRpcConfig } from "./env.ts";
 import { toChecksumAddress } from "./checksum.ts";
 import { resolveChain } from "./chains.ts";
 import {
+  RpcConfigError,
   getRpcUrl,
   tryRpcUrl,
   setRpcOverride,
@@ -32,6 +33,7 @@ import {
   UnsupportedSideError,
   VENUE_OPTIONS,
   VENUES,
+  type BuildResult,
   type NormalizedQuote,
   type NormalizedTx,
   type NormalizedOrder,
@@ -57,7 +59,24 @@ import { getReferralConfig, setNoFeeMode, setReferralMode } from "./referral.ts"
 import { setOdosV2NoCompact, setOdosV2DisableRfqs } from "./venues/odosv2.ts";
 import { setOdosDisableRfqs } from "./venues/odos.ts";
 import { addWallet, listWallets, resolveWalletInput } from "./wallets.ts";
-import { startBrowserSession, type SimulateOutcomeWire } from "./browser.ts";
+import {
+  openBrowser,
+  startBrowserSession,
+  type ApprovalForBrowser,
+  type SimulateOutcomeWire,
+} from "./browser.ts";
+import {
+  HOSTED_DEFAULT,
+  remoteBuild,
+  remoteMode,
+  remoteQuoteAll,
+  remoteQuoteSingle,
+  remoteQuoteStream,
+  remoteResolveAddresses,
+  remoteResolveToken,
+  resolveApiBase,
+  type RemoteMode,
+} from "./remote.ts";
 import { fillGasUsd, fillGasUsdAll } from "./gas_usd.ts";
 import { fetchTokenPriceUsd } from "./prices.ts";
 import { toJson } from "./json.ts";
@@ -182,12 +201,31 @@ type ResolvedCtx = {
   side: TradeSide;
   slippageBps: number;
   allowAsync: boolean;
+  /** Hosted mode: quote/build go over `/api/*` at this base. null = local engine. */
+  apiBase: string | null;
+  /** `--disableodosrfq`; forwarded on the wire in hosted mode (a module flag locally). */
+  disableOdosRfq?: boolean;
 };
 
 async function runSingleVenue(
   venue: Venue,
   ctx: ResolvedCtx,
 ): Promise<NormalizedQuote> {
+  if (ctx.apiBase) {
+    return remoteQuoteSingle({
+      base: ctx.apiBase,
+      venue,
+      chain: ctx.chain,
+      tokenIn: ctx.tokenIn,
+      tokenOut: ctx.tokenOut,
+      amountIn: ctx.amountIn,
+      amountOut: ctx.amountOut,
+      side: ctx.side,
+      slippageBps: ctx.slippageBps,
+      allowAsync: ctx.allowAsync,
+      disableOdosRfq: ctx.disableOdosRfq,
+    });
+  }
   return fetchQuote({
     venue,
     chain: ctx.chain,
@@ -304,17 +342,43 @@ async function runAllVenues(
     allowAsync: ctx.allowAsync,
     venues: venuesFilter,
   };
+  // Hosted mode swaps the engine, not the pipeline: the same VenueResult
+  // stream feeds the same live progress rows, pickBest and comparison block.
+  const remoteParams = {
+    base: ctx.apiBase ?? "",
+    chain: ctx.chain,
+    tokenIn: ctx.tokenIn,
+    tokenOut: ctx.tokenOut,
+    amountIn: ctx.amountIn,
+    amountOut: ctx.amountOut,
+    side: ctx.side,
+    slippageBps: ctx.slippageBps,
+    allowAsync: ctx.allowAsync,
+    venues: venuesFilter,
+    disableOdosRfq: ctx.disableOdosRfq,
+  };
   if (onProgress) {
-    for await (const r of fetchAllQuotesStream(sharedParams)) {
+    const stream = ctx.apiBase
+      ? remoteQuoteStream(remoteParams)
+      : fetchAllQuotesStream(sharedParams);
+    for await (const r of stream) {
       if ("quote" in r) await fillGasUsd(r.quote, ctx.chain);
       raw.push(r);
       onProgress(r, Date.now() - start);
     }
+  } else if (ctx.apiBase) {
+    raw.push(...(await remoteQuoteAll(remoteParams)));
   } else {
     raw.push(...(await fetchAllQuotes(sharedParams)));
   }
   return raw;
 }
+
+// Set when hosted mode is on but the requested action still runs against the
+// local engine (`-a send` / `unwrapwrseth` / … build their calldata locally and
+// read the chain directly). Appended to an `RpcConfigError` by the top-level
+// catch so a hosted user isn't left wondering why the run still wants an RPC.
+let hostedLocalActionNote: string | null = null;
 
 async function main(): Promise<void> {
   // `swap update` is a standalone subcommand. First user arg only.
@@ -337,16 +401,46 @@ async function main(): Promise<void> {
     return;
   }
 
+  // `swap`, `swap --hosted` and `swap --local` all count as "no positional
+  // args": the two mode flags only pick which surface to open, they are not a
+  // quote request.
+  const bareArgs = process.argv.slice(2);
+  const isBareLaunch =
+    bareArgs.length === 0 ||
+    (bareArgs.length === 1 &&
+      (bareArgs[0] === "--hosted" || bareArgs[0] === "--local"));
+
   // Sniff --browser before commander so quotes in this process already carry it.
   if (process.argv.includes("--browser")) {
     setReferralMode("browser");
-  } else if (process.argv.slice(2).length === 0) {
+  } else if (isBareLaunch) {
     // `swap` with no arguments at all launches the interactive dApp: a local
     // web server serving the 9Summits aggregator UI (pick tokens/amount/chain
     // in the browser → compare every venue → pick a route → connect → swap).
     // Any positional/flag args fall through to the normal commander pipeline,
     // so `swap --help`, `swap 1 WBTC ETH`, etc. are unaffected.
     setReferralMode("dapp");
+    // In hosted mode there is nothing to serve locally — the same dApp is
+    // already running at the hosted base. Open it instead of standing up a
+    // second copy that would need every venue key.
+    const bareBase = resolveApiBase({
+      hosted: bareArgs[0] === "--hosted",
+      local: bareArgs[0] === "--local",
+    });
+    if (bareBase) {
+      console.error(
+        `  ${pc.cyan("hosted")}  ${pc.dim("the interactive dApp runs at")} ${bareBase}`,
+      );
+      console.error(
+        `          ${pc.dim("(run `swap --local` to start the local dApp server instead)")}`,
+      );
+      if (process.env.NO_BROWSER_OPEN) {
+        console.log(bareBase);
+      } else {
+        openBrowser(bareBase);
+      }
+      return;
+    }
     const { startServeSession } = await import("./serve.ts");
     await startServeSession();
     return;
@@ -439,6 +533,16 @@ async function main(): Promise<void> {
       "amount is denominated in tokenOut (buy exact-out): pay as little tokenIn as possible to receive that amount",
       false,
     )
+    .option(
+      "--hosted",
+      `quote and build through the hosted API (${HOSTED_DEFAULT}) instead of the local engine — no venue API key, no RPC needed (except --simulate). Nothing is ever signed remotely`,
+      false,
+    )
+    .option(
+      "--local",
+      "force the local engine even when SWAP_API_URL is set — uses your own venue keys and RPC",
+      false,
+    )
     .showHelpAfterError()
     .action(
       async (
@@ -466,6 +570,8 @@ async function main(): Promise<void> {
           odosnotcompact: boolean;
           disableodosrfq: boolean;
           exactOut: boolean;
+          hosted: boolean;
+          local: boolean;
           showcustomhelp?: boolean;
         },
       ) => {
@@ -612,6 +718,38 @@ async function main(): Promise<void> {
           throw new Error("--browser and --json are mutually exclusive");
         }
 
+        // ── hosted mode ────────────────────────────────────────────────────
+        // `--local` > `--hosted` > $SWAP_API_URL. A non-null base means every
+        // quote and every build goes through the stateless `/api/*` contract
+        // instead of the local venue engine — no venue API key, no RPC. The
+        // CLI still never signs anything: it renders what comes back.
+        const apiBase = resolveApiBase({
+          hosted: opts.hosted,
+          local: opts.local,
+        });
+        // Only `-a swap` is served remotely. The other actions hand-build their
+        // own calldata (transfer / deposit / requestUnlock / redeem) and read
+        // the chain directly, so they stay 100% local even in hosted mode.
+        const hostedSwap = apiBase !== null && opts.action === "swap";
+        if (apiBase && !hostedSwap) {
+          hostedLocalActionNote =
+            `\`-a ${opts.action}\` runs locally even in hosted mode ` +
+            `(it builds its own calldata and reads the chain directly).`;
+        }
+        if (apiBase && opts.nofee) {
+          throw new Error(
+            "--nofee has no effect in hosted mode: the fee policy is server-side. " +
+              "Use --local with your own keys",
+          );
+        }
+        if (hostedSwap) {
+          // stderr, never stdout — `--simple` pipes a bare number and `--json`
+          // must stay a single parseable object.
+          process.stderr.write(
+            `  ${pc.cyan("hosted")}  ${pc.dim(`quotes and tx build via ${apiBase}`)}\n`,
+          );
+        }
+
         // --rpc <url>: install the override before any RPC consumer runs.
         // Validate as a URL up front so a malformed value fails fast instead
         // of bleeding into venue/curve init with a cryptic error.
@@ -640,7 +778,14 @@ async function main(): Promise<void> {
         // isn't a TTY, when --json/--simple is set, when ~/.swap exists,
         // or when an RPC is already configured. May write ~/.swap and
         // re-load env.
-        await maybePromptForRpcConfig({ json: opts.json, simple: opts.simple });
+        // A hosted swap needs no local RPC, so don't nag for a key the run will
+        // never use. `--simulate` (local eth_simulateV1), `amount=max` (balance
+        // read) and the non-swap actions still do, and keep the prompt.
+        const hostedNeedsNoRpc =
+          hostedSwap && !opts.simulate && amountStr.toLowerCase() !== "max";
+        if (!hostedNeedsNoRpc) {
+          await maybePromptForRpcConfig({ json: opts.json, simple: opts.simple });
+        }
 
         // --simulate needs the swap calldata to run, so we always build
         // the tx behind the scenes. We do NOT auto-promote --simulate to
@@ -711,6 +856,14 @@ async function main(): Promise<void> {
         // by the action so we skip the resolver entirely; the user
         // can type any placeholder for <tokenIn> and the right pair
         // is used.
+        // Hosted swaps resolve through /api/resolve-token, so the CLI needs no
+        // RPC for the on-chain decimals fallback. The decimals still come from
+        // a validated server field — never defaulted (see docs/conventions.md).
+        const resolveOne = (input: string): Promise<Token> =>
+          hostedSwap
+            ? remoteResolveToken({ base: apiBase as string, chain, input })
+            : resolveToken(input, chain);
+
         const [tokenIn, tokenOut] = isUnwrapWrseth
           ? [makeWrsethToken(), makeRsethToken()]
           : isWithdrawSparkWeth
@@ -718,10 +871,8 @@ async function main(): Promise<void> {
             : isUnstakeSavax || isClaimSavax
               ? [makeSavaxToken(), makeAvaxNativeToken()]
               : await Promise.all([
-                  resolveToken(inArg, chain),
-                  isSend
-                    ? resolveToken(inArg, chain)
-                    : resolveToken(outArg as string, chain),
+                  resolveOne(inArg),
+                  resolveOne(isSend ? inArg : (outArg as string)),
                 ]);
         if (isUnwrapWrseth && chain.chainId !== BASE_CHAIN_ID) {
           // Defense in depth — the --chain string check above caught
@@ -884,6 +1035,8 @@ async function main(): Promise<void> {
           side,
           slippageBps,
           allowAsync: opts.allowAsync,
+          apiBase: hostedSwap ? apiBase : null,
+          disableOdosRfq: opts.disableodosrfq,
         };
 
         // Native ↔ wrapped-native short-circuit. Skip the venue loop
@@ -992,24 +1145,71 @@ async function main(): Promise<void> {
           const venueArg = opts.venue;
           const isMulti = venueArg === "all" || Array.isArray(venueArg);
 
+          // Hosted: the venue roster belongs to the deployment, not to our env
+          // keys. The same round-trip pins the wire contract version before we
+          // send a quote. Curve isn't offered there, so it drops out naturally.
+          let hostedVenues: Venue[] = [];
+          if (ctx.apiBase) {
+            const mode: RemoteMode = await remoteMode(ctx.apiBase);
+            hostedVenues = mode.venues
+              .filter((v) => ctx.allowAsync || v.kind !== "async")
+              .map((v) => v.name);
+            if (hostedVenues.length === 0) {
+              throw new Error(
+                `${ctx.apiBase} offers no venue for this request` +
+                  (ctx.allowAsync ? "" : " (try --allow-async)"),
+              );
+            }
+          }
+
           if (isMulti) {
-            const venuesFilter = Array.isArray(venueArg)
-              ? venueArg
-              : undefined;
-            const keyNote = formatMissingApiKeyNote(
-              missingApiKeySkips({
-                allowAsync: ctx.allowAsync,
-                venues: venuesFilter,
-              }),
-            );
-            if (keyNote) console.error(keyNote);
+            const venuesFilter = ctx.apiBase
+              ? Array.isArray(venueArg)
+                ? venueArg.filter((v) => hostedVenues.includes(v))
+                : hostedVenues
+              : Array.isArray(venueArg)
+                ? venueArg
+                : undefined;
+            if (ctx.apiBase && venuesFilter && venuesFilter.length === 0) {
+              throw new Error(
+                `none of the requested venues are offered by ${ctx.apiBase} ` +
+                  `(offers: ${hostedVenues.join(", ")})`,
+              );
+            }
+            // A partially-offered `-v a,b` list runs on what the deployment has,
+            // but say which venues were dropped: silently narrowing the race
+            // would look like a worse market, not a roster gap.
+            if (ctx.apiBase && Array.isArray(venueArg)) {
+              const dropped = venueArg.filter((v) => !hostedVenues.includes(v));
+              if (dropped.length > 0) {
+                console.error(
+                  `  ${pc.yellow("skipped")}  ${pc.dim(`${dropped.join(", ")}: not offered by ${ctx.apiBase}`)}`,
+                );
+              }
+            }
+            // The local missing-key note is about *our* env; in hosted mode the
+            // keys are the deployment's and the note would be a lie.
+            if (!ctx.apiBase) {
+              const keyNote = formatMissingApiKeyNote(
+                missingApiKeySkips({
+                  allowAsync: ctx.allowAsync,
+                  venues: venuesFilter,
+                }),
+              );
+              if (keyNote) console.error(keyNote);
+            }
             // On exact-out, pre-list sell-only venues; after the race (which
             // includes the sell-refine pass), drop those that actually competed
             // so the comparison doesn't double-show them as "skipped".
             if (side === "buy") {
-              const skips = skippedVenues({ allowAsync: ctx.allowAsync, side: "buy" })
-                .filter((s) => s.reason === "sell-only")
-                .map((s) => s.venue);
+              // Hosted: derive sell-only from the deployment's roster —
+              // skippedVenues() keys on our local env vars, which say nothing
+              // about what the server can reach.
+              const skips = ctx.apiBase
+                ? hostedVenues.filter((v) => !isBuyCapable(v))
+                : skippedVenues({ allowAsync: ctx.allowAsync, side: "buy" })
+                    .filter((s) => s.reason === "sell-only")
+                    .map((s) => s.venue);
               sellOnlySkipped = venuesFilter
                 ? skips.filter((v) => venuesFilter.includes(v))
                 : skips;
@@ -1074,6 +1274,12 @@ async function main(): Promise<void> {
             comparisonRank = rank;
             fillMissingQuoteUsd(winner.quote, tokenIn, tokenOut, usdByAddr);
           } else {
+            if (ctx.apiBase && !hostedVenues.includes(venueArg)) {
+              throw new Error(
+                `venue ${venueArg} not offered by ${ctx.apiBase} ` +
+                  `(offers: ${hostedVenues.join(", ")})`,
+              );
+            }
             const quote = await runSingleVenue(venueArg, ctx);
             winner = { venue: venueArg, quote };
             await fillGasUsd(winner.quote, chain);
@@ -1118,6 +1324,11 @@ async function main(): Promise<void> {
           needed: bigint;
           sufficient: boolean;
         } | null = null;
+        // Hosted build extras: the deployment already did the allowance read
+        // (same ceiling logic as here) and, for permit-tx, handed back the
+        // opaque context its stateless /assemble expects.
+        let remoteApproval: ApprovalForBrowser | null = null;
+        let remoteAssembleContext: unknown = undefined;
 
         if (buildNeeded) {
           // The earlier guard guarantees `sender` is non-null when
@@ -1171,19 +1382,44 @@ async function main(): Promise<void> {
             // exact-in: build() rewrites side+slippage from the tag. Native buy
             // still threads amountOut + side=buy for EXACT_OUTPUT adapters.
             const isBuyRefine = !!winner.quote.buyRefine;
-            const result = await build(winner.venue as Venue, {
-              chain,
-              tokenIn: tokenIn.address,
-              tokenOut: tokenOut.address,
-              tokenInDecimals: tokenIn.decimals,
-              tokenOutDecimals: tokenOut.decimals,
-              amountIn: payAmountIn,
-              amountOut: side === "buy" && !isBuyRefine ? amountOut : undefined,
-              side: isBuyRefine ? "sell" : side,
-              sender,
-              slippageBps,
-              quote: winner.quote,
-            });
+            let result: BuildResult;
+            if (ctx.apiBase) {
+              // The server re-quotes the venue with the real sender and redoes
+              // the exact-out sell-refine itself, so we hand it the pay/receive
+              // legs — never our NormalizedQuote.
+              const built = await remoteBuild({
+                base: ctx.apiBase,
+                chain,
+                venue: winner.venue,
+                sender,
+                slippageBps,
+                tokenIn,
+                tokenOut,
+                amountIn: payAmountIn,
+                amountOut: side === "buy" ? amountOut : undefined,
+                side,
+                odosNotCompact: opts.odosnotcompact,
+                disableOdosRfq: opts.disableodosrfq,
+              });
+              result = built.result;
+              remoteApproval = built.approval;
+              remoteAssembleContext = built.assembleContext;
+            } else {
+              result = await build(winner.venue as Venue, {
+                chain,
+                tokenIn: tokenIn.address,
+                tokenOut: tokenOut.address,
+                tokenInDecimals: tokenIn.decimals,
+                tokenOutDecimals: tokenOut.decimals,
+                amountIn: payAmountIn,
+                amountOut:
+                  side === "buy" && !isBuyRefine ? amountOut : undefined,
+                side: isBuyRefine ? "sell" : side,
+                sender,
+                slippageBps,
+                quote: winner.quote,
+              });
+            }
 
             // Pull spender out of any kind — all three (tx / order /
             // permit-tx) expose it for the allowance check.
@@ -1211,7 +1447,19 @@ async function main(): Promise<void> {
           // neither needs an ERC20 approval (deposit pulls via
           // msg.value; withdraw burns msg.sender's own WETH; transfer
           // operates on msg.sender's own balance).
-          if (!isNativeIn && !wrapMode && !isSend && !isUnwrapWrseth && !isWithdrawSparkWeth && !isUnstakeSavax && !isClaimSavax) {
+          if (ctx.apiBase) {
+            // Hosted: /api/build already read allowance(owner, spender) with
+            // the same ceiling rule (exact pay on sell, maxAmountIn on a native
+            // buy) and shipped the approve tx. No local RPC, no second read.
+            if (remoteApproval) {
+              allowanceInfo = {
+                current: BigInt(remoteApproval.current),
+                needed: BigInt(remoteApproval.required),
+                sufficient: !remoteApproval.needed,
+              };
+              approveTx = remoteApproval.approveTx ?? null;
+            }
+          } else if (!isNativeIn && !wrapMode && !isSend && !isUnwrapWrseth && !isWithdrawSparkWeth && !isUnstakeSavax && !isClaimSavax) {
             if (!rpc) {
               console.error(
                 pc.yellow("!") +
@@ -1293,7 +1541,20 @@ async function main(): Promise<void> {
               reason: "no sender resolved",
             } satisfies SimulationOutcome);
           } else {
-            const rpc = getRpcUrl(chain);
+            // --simulate stays local even in hosted mode: eth_simulateV1 with
+            // state overrides is the user's own RPC, never the deployment's.
+            let rpc: string;
+            try {
+              rpc = getRpcUrl(chain);
+            } catch (e) {
+              if (ctx.apiBase && e instanceof RpcConfigError) {
+                throw new Error(
+                  "--simulate needs a local RPC even in hosted mode " +
+                    "(set ALCHEMY_API_KEY or --rpc), or drop --simulate",
+                );
+              }
+              throw e;
+            }
             const swapTxPayload = { to: tx.to, data: tx.data, value: tx.value };
             const spender = tx.spender;
             const venueForHint = winner.venue;
@@ -1377,10 +1638,13 @@ async function main(): Promise<void> {
             }
           }
         }
-        const intermediaries = await resolveAddresses(
-          [...intermediateAddrs],
-          chain,
-        );
+        const intermediaries = ctx.apiBase
+          ? await remoteResolveAddresses({
+              base: ctx.apiBase,
+              chain,
+              addresses: [...intermediateAddrs],
+            })
+          : await resolveAddresses([...intermediateAddrs], chain);
 
         // Top-level discriminator for JSON consumers: tells scripts whether
         // to broadcast `tx.data`, sign `order.typedData`, or sign
@@ -1686,7 +1950,9 @@ async function main(): Promise<void> {
                 } catch (e) {
                   return {
                     kind: "skipped",
-                    reason: (e as Error).message ?? "no RPC configured",
+                    reason: ctx.apiBase
+                      ? "--simulate needs a local RPC even in hosted mode (set ALCHEMY_API_KEY or --rpc)"
+                      : ((e as Error).message ?? "no RPC configured"),
                   };
                 }
                 // Run the simulation and the two price fetches in
@@ -1760,6 +2026,13 @@ async function main(): Promise<void> {
             assemble: assembleCallback,
             simulate: simulateCallback,
             approval: allowanceForBrowser,
+            // Hosted: the local page still needs a same-origin /assemble and
+            // /submit (the API sends no CORS headers), so this server becomes a
+            // plain proxy for those two legs.
+            ...(ctx.apiBase ? { remoteBase: ctx.apiBase } : {}),
+            ...(remoteAssembleContext !== undefined
+              ? { assembleContext: remoteAssembleContext }
+              : {}),
           });
           console.log(
             `  ${pc.cyan("browser")}  ${pc.dim("opening")} ${session.url}`,
@@ -1799,7 +2072,12 @@ async function main(): Promise<void> {
 
 main()
   .catch((err: unknown) => {
-    const msg = err instanceof Error ? err.message : String(err);
+    let msg = err instanceof Error ? err.message : String(err);
+    // Hosted mode + a local-only action: say why an RPC is still required
+    // rather than leaving the user to wonder what the hosted API was for.
+    if (err instanceof RpcConfigError && hostedLocalActionNote) {
+      msg = `${msg} ${hostedLocalActionNote}`;
+    }
     if (process.argv.includes("--json")) {
       console.log(JSON.stringify({ error: msg }, null, 2));
     } else {
