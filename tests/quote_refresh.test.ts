@@ -3,6 +3,7 @@ import {
   removeRawVenue,
   seedRawRoutes,
   shouldAutoRefresh,
+  shouldHoldQuotes,
   shouldKeepPrevious,
   upsertRawRoute,
 } from "../web/src/dapp/useQuote.ts";
@@ -127,6 +128,34 @@ test("no expiresAt + visible + visible-source + !pending → false", () => {
       source: "visible",
     }),
   ).toBe(false);
+});
+
+test("paused + expired + visible → false", () => {
+  expect(
+    shouldAutoRefresh({
+      visible: true,
+      now: EXP + 1,
+      expiresAt: EXP,
+      pendingWhileHidden: false,
+      firedForExpiresAt: null,
+      source: "timer",
+      paused: true,
+    }),
+  ).toBe(false);
+});
+
+test("shouldHoldQuotes: building and in-flight ready", () => {
+  expect(shouldHoldQuotes({ execPhase: "building", runStage: null })).toBe(true);
+  expect(shouldHoldQuotes({ execPhase: "ready", runStage: null })).toBe(true);
+  expect(shouldHoldQuotes({ execPhase: "ready", runStage: "approve" })).toBe(true);
+  expect(shouldHoldQuotes({ execPhase: "ready", runStage: "swap" })).toBe(true);
+});
+
+test("shouldHoldQuotes: idle / error / terminal ready", () => {
+  expect(shouldHoldQuotes({ execPhase: "idle", runStage: null })).toBe(false);
+  expect(shouldHoldQuotes({ execPhase: "error", runStage: null })).toBe(false);
+  expect(shouldHoldQuotes({ execPhase: "ready", runStage: "done" })).toBe(false);
+  expect(shouldHoldQuotes({ execPhase: "ready", runStage: "error" })).toBe(false);
 });
 
 test("upsertRawRoute inserts then replaces by venue", () => {

@@ -9,7 +9,7 @@ import { SwapForm } from "./SwapForm";
 import { RoutesPane } from "./RoutesPane";
 import { RouteGraph } from "./RouteGraph";
 import { TokenSelector } from "./TokenSelector";
-import { useQuote, NATIVE_SENTINEL, toBaseUnits } from "./useQuote";
+import { useQuote, shouldHoldQuotes, NATIVE_SENTINEL, toBaseUnits } from "./useQuote";
 import { getTokens, postBuild, postRoute, resolveToken } from "./api";
 import { readUrlState, writeUrlState } from "./urlState";
 import { curveSupportedChain, buildCurve } from "./curve/client";
@@ -212,6 +212,10 @@ export function InteractiveDapp({ mode, sid }: { mode: ApiMode; sid: string }) {
   // Live step reported by SendTx / SignOrder / SignPermitTx so the action
   // button mirrors approve → swap → done instead of spinning forever.
   const [execRun, setExecRun] = React.useState<SendTxRun | null>(null);
+  // Venue captured at Swap click. While quotes are held, the routes pane
+  // keeps highlighting this row even if a late stream event would have
+  // moved `best`.
+  const [heldVenue, setHeldVenue] = React.useState<string | null>(null);
 
   // ---- route graph (the selected venue's hops, for the graphical view) ----
   const [routeGraph, setRouteGraph] = React.useState<RouteGraphResponse | null>(
@@ -256,6 +260,7 @@ export function InteractiveDapp({ mode, sid }: { mode: ApiMode; sid: string }) {
       setSelectedVenue(null);
       setExec({ phase: "idle" });
       setExecRun(null);
+      setHeldVenue(null);
     }
     getTokens(sid, chain.alias)
       .then(async (list) => {
@@ -546,6 +551,13 @@ export function InteractiveDapp({ mode, sid }: { mode: ApiMode; sid: string }) {
   // -------------------------------------------------------------------------
   // Quote lifecycle.
   // -------------------------------------------------------------------------
+  // Freeze the ranked list while a tx is being built or the wallet is being
+  // asked to approve/sign. A refresh here would change best venue under an
+  // already-sent approve (Velora spender, then a swap on whoever won next).
+  const quotesHeld = shouldHoldQuotes({
+    execPhase: exec.phase,
+    runStage: exec.phase === "ready" ? execRun?.stage : null,
+  });
   const {
     quote,
     loading: quoteLoading,
@@ -569,16 +581,21 @@ export function InteractiveDapp({ mode, sid }: { mode: ApiMode; sid: string }) {
     allVenueCount: venues.length,
     isSend,
     serverHasCurve,
+    paused: quotesHeld,
   });
 
   // The EFFECTIVE venue follows the live best as routes stream in, UNLESS the
   // user has pinned one by clicking a route (selectedVenue) and it's still
-  // present. Deriving it (rather than storing) avoids fighting the streaming
+  // present — or a swap is in flight, in which case the click-time venue
+  // stays selected so a late stream event cannot retarget the UI.
+  // Deriving it (rather than storing) avoids fighting the streaming
   // best — the pin is cleared on any quote-input change by the effect below.
   const effectiveVenue =
-    selectedVenue && quote?.routes.some((r) => r.venue === selectedVenue)
-      ? selectedVenue
-      : quote?.best.venue ?? null;
+    quotesHeld && heldVenue
+      ? heldVenue
+      : selectedVenue && quote?.routes.some((r) => r.venue === selectedVenue)
+        ? selectedVenue
+        : quote?.best.venue ?? null;
 
   // The full route object for the effective venue (when present this round).
   // `clientSide` marks the in-browser curve route, which the build + route-
@@ -754,6 +771,7 @@ export function InteractiveDapp({ mode, sid }: { mode: ApiMode; sid: string }) {
   React.useEffect(() => {
     setExec((prev) => (prev.phase === "ready" ? { phase: "idle" } : prev));
     setExecRun(null);
+    setHeldVenue(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     chain.alias,
@@ -835,6 +853,7 @@ export function InteractiveDapp({ mode, sid }: { mode: ApiMode; sid: string }) {
     const activeToken = buyMode ? tokenOut : tokenIn;
     const buildAmount = toBaseUnits(amount, activeToken.decimals);
     if (!buildAmount) return;
+    setHeldVenue(venue || null);
     // Native buy: amountOut + side. Sell-refine buy: amountOut + amountIn (pay
     // seed from the selected route) + side so the server rebuilds as exact-in
     // with min-out ≥ target. Sell: amountIn only.
@@ -919,6 +938,7 @@ export function InteractiveDapp({ mode, sid }: { mode: ApiMode; sid: string }) {
     // the live quote keeps auto-refreshing on its own.
     setExec({ phase: "idle" });
     setExecRun(null);
+    setHeldVenue(null);
     setRecipient("");
   }
 
@@ -1111,14 +1131,20 @@ export function InteractiveDapp({ mode, sid }: { mode: ApiMode; sid: string }) {
             <RoutesPane
               quote={quote}
               selectedVenue={effectiveVenue}
-              onSelect={(v) => setSelectedVenue(v)}
+              onSelect={(v) => {
+                if (quotesHeld) return;
+                setSelectedVenue(v);
+              }}
               action={noRouteNote}
               onRefresh={refresh}
               refreshLocked={refreshLocked}
               streaming={quoteStreaming}
               secondsToExpiry={secondsToExpiry}
               allowAsync={allowAsync}
-              onAllowAsync={setAllowAsync}
+              onAllowAsync={(allow) => {
+                if (quotesHeld) return;
+                setAllowAsync(allow);
+              }}
             />
           </div>
         </div>

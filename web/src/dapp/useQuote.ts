@@ -43,7 +43,11 @@ export function shouldAutoRefresh(args: {
   pendingWhileHidden: boolean;
   firedForExpiresAt: number | null;
   source: "timer" | "visible";
+  // Build / wallet-signature in flight: never rotate the ranked list under
+  // an approve or swap the user is already signing.
+  paused?: boolean;
 }): boolean {
+  if (args.paused) return false;
   if (!args.visible) return false;
   if (args.expiresAt != null) {
     if (args.now < args.expiresAt) return false;
@@ -51,6 +55,17 @@ export function shouldAutoRefresh(args: {
   }
   if (args.source === "timer") return true;
   return args.pendingWhileHidden;
+}
+
+// Hold the displayed quote while a swap is being built or signed. `runStage`
+// is null between setExec(ready) and the first SendTx onPhase report.
+export function shouldHoldQuotes(args: {
+  execPhase: "idle" | "building" | "error" | "ready";
+  runStage: "approve" | "swap" | "done" | "error" | null | undefined;
+}): boolean {
+  if (args.execPhase === "building") return true;
+  if (args.execPhase !== "ready") return false;
+  return args.runStage !== "done" && args.runStage !== "error";
 }
 
 export function upsertRawRoute(raw: RawRoute[], route: RawRoute): void {
@@ -154,6 +169,10 @@ export type UseQuoteArgs = {
   serverHasCurve: boolean;
   // CLI --disableodosrfq / Settings → Advanced: odos/odosv2 disableRFQs.
   disableOdosRfq?: boolean;
+  // True while a swap is building or waiting on a wallet signature. Blocks
+  // auto-refresh and the manual refresh button so the ranked best cannot
+  // change under an in-flight approve/swap.
+  paused?: boolean;
 };
 
 export type UseQuoteResult = {
@@ -172,7 +191,8 @@ export type UseQuoteResult = {
   // form can show "you receive" without a backend round-trip. null for swap/send.
   synthAmountOut: string | null;
   refresh: () => void;
-  // True for MANUAL_LOCK_MS after stream `done`. Independent of `streaming`.
+  // True for MANUAL_LOCK_MS after stream `done`, and while `paused`. Independent
+  // of `streaming`.
   refreshLocked: boolean;
   // Seconds until the live quote expires (from QuoteResponse.expiresAt). null
   // when there is no quote or no expiry.
@@ -188,7 +208,8 @@ export type UseQuoteResult = {
 //
 //   · debounces the form inputs ~400ms, converts the amount to base units, and
 //     POSTs /api/quote (no wallet needed);
-//   · auto-refreshes every ~20s while the inputs are stable;
+//   · auto-refreshes every ~20s while the inputs are stable, unless `paused`
+//     (swap building / wallet signature in flight);
 //   · short-circuits wrap/unwrap (native↔wrapped 1:1) and send to NOT hit the
 //     backend — those have no routing — and instead exposes a synthesized 1:1
 //     amount-out (wrap/unwrap) for display;
@@ -207,6 +228,7 @@ export function useQuote(args: UseQuoteArgs): UseQuoteResult {
     isSend,
     serverHasCurve,
     disableOdosRfq = false,
+    paused = false,
   } = args;
 
   const sid = sessionId();
@@ -257,6 +279,8 @@ export function useQuote(args: UseQuoteArgs): UseQuoteResult {
   const [now, setNow] = useState(() => Date.now());
   const [refreshLocked, setRefreshLocked] = useState(false);
   const refreshLockedRef = useRef(false);
+  const pausedRef = useRef(false);
+  pausedRef.current = paused;
   const lockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const expiresAtRef = useRef<number | null>(null);
   const firedForExpiresAtRef = useRef<number | null>(null);
@@ -340,6 +364,7 @@ export function useQuote(args: UseQuoteArgs): UseQuoteResult {
   const runQuote = useCallback(
     async (_key: string, keepPrevious: boolean) => {
       if (!tokenIn || !tokenOut || !baseUnits) return;
+      if (pausedRef.current) return;
       const seq = ++seqRef.current;
       abortRef.current?.abort();
       const ac = new AbortController();
@@ -686,6 +711,7 @@ export function useQuote(args: UseQuoteArgs): UseQuoteResult {
     });
     lastKeyRef.current = reqKey;
     const handle = setTimeout(() => {
+      if (pausedRef.current) return;
       void runQuote(reqKey, keepPrevious);
     }, purge ? 0 : DEBOUNCE_MS);
     return () => clearTimeout(handle);
@@ -694,6 +720,9 @@ export function useQuote(args: UseQuoteArgs): UseQuoteResult {
   }, [reqKey, nonce, needsQuote]);
 
   const beginPurgingRound = useCallback(() => {
+    // Render-time pausedRef so a due timer that fires between paint and
+    // effect cleanup cannot blank the list under an in-flight swap.
+    if (pausedRef.current) return;
     seqRef.current++;
     abortRef.current?.abort();
     purgeListRef.current = true;
@@ -707,14 +736,27 @@ export function useQuote(args: UseQuoteArgs): UseQuoteResult {
     setNonce((n) => n + 1);
   }, []);
 
+  // Drop an in-flight re-stream when a swap starts so a late `route` cannot
+  // flip best under the wallet prompt. Keep the last displayed quote.
+  useEffect(() => {
+    if (!paused) return;
+    seqRef.current++;
+    abortRef.current?.abort();
+    setRefreshing(false);
+    setStreaming(false);
+  }, [paused]);
+
   // Auto-refresh at quote.expiresAt (REFRESH_MS fallback). Hidden tabs skip
   // the fire; a skipped fire never reschedules (expiresAt unchanged), so
   // visibilitychange has to catch up. Same purge-then-stream as the button.
+  // Paused (swap in flight): tear down the timer; unpause reschedules, and an
+  // already-expired quote fires immediately (delay 0).
   useEffect(() => {
     if (!needsQuote) {
       pendingWhileHiddenRef.current = false;
       return;
     }
+    if (paused) return;
 
     const autoFire = (source: "timer" | "visible") => {
       const visible = document.visibilityState === "visible";
@@ -731,6 +773,7 @@ export function useQuote(args: UseQuoteArgs): UseQuoteResult {
           pendingWhileHidden: pendingWhileHiddenRef.current,
           firedForExpiresAt: firedForExpiresAtRef.current,
           source,
+          paused: pausedRef.current,
         })
       ) {
         return;
@@ -759,7 +802,7 @@ export function useQuote(args: UseQuoteArgs): UseQuoteResult {
       clearTimeout(id);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [needsQuote, quote?.expiresAt, beginPurgingRound]);
+  }, [needsQuote, quote?.expiresAt, beginPurgingRound, paused]);
 
   // Tick a clock once per second so secondsToExpiry counts down live. Only runs
   // while there's a quote with an expiry.
@@ -771,7 +814,7 @@ export function useQuote(args: UseQuoteArgs): UseQuoteResult {
   }, [quote]);
 
   const refresh = useCallback(() => {
-    if (refreshLockedRef.current) return;
+    if (refreshLockedRef.current || pausedRef.current) return;
     beginPurgingRound();
   }, [beginPurgingRound]);
 
@@ -789,7 +832,7 @@ export function useQuote(args: UseQuoteArgs): UseQuoteResult {
     mode,
     synthAmountOut,
     refresh,
-    refreshLocked,
+    refreshLocked: refreshLocked || paused,
     secondsToExpiry,
     curveRouteHops: needsQuote ? curveRouteHops : null,
   };

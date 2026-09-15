@@ -292,7 +292,8 @@ export interface RoutesPaneProps {
   action: React.ReactNode;
   // Re-quote control surfaced as a refresh button in the pane header.
   onRefresh?: () => void;
-  // First 3s of a new countdown. Streaming does not lock clicks.
+  // First 3s of a new countdown, or while a swap is in flight. Streaming does
+  // not lock clicks.
   refreshLocked?: boolean;
   // True from stream start until ALL venues have settled. Spins the refresh icon
   // (until every quote is in), keeps the button visible mid-stream, and shows

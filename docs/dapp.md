@@ -191,7 +191,9 @@ added to the settings list when (a)+(b) hold).
 - `useQuote` injects the curve route into the round (`clientSide: true` marker),
   re-sorts, re-derives best; `InteractiveDapp` routes build/route-graph for
   clientSide routes to the module instead of `/api/build` // `/api/route`.
-  Manual and auto refresh purge the route list. Venues then stream in as
+  Manual and auto refresh purge the route list. Both are paused while a
+  swap is building or waiting on a wallet approve/signature, so the ranked
+  best cannot change under an in-flight approve. Venues then stream in as
   each `route` or `verror` arrives. Client-side curve updates only its own
   row. `done` drops venues that did not settle this round.
   A venue that errors lands in the pane's "N venues unavailable" list, where
