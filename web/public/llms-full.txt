@@ -213,7 +213,7 @@ No public pricing page. The product is open source under the Apache License 2.0.
 
 - License: Apache License 2.0 (© 9Summits; see LICENSE and NOTICE in the source repository). The prebuilt CLI binary bundles the GPL-3.0-or-later `@ophis/sdk`, so the binary as a whole is distributed under GPL-3.0 terms.
 - CLI manual (human-readable `swap --help` with examples): https://swap.9summits.io/docs (Markdown: /docs.md)
-- Terms of Use, Risk Disclaimer & Privacy: https://swap.9summits.io/terms.html (non-custodial interface, no accounts, no cookies, no trackers, no client-side analytics; keeps aggregate anonymous swap-outcome counters — venue, chain id, outcome — via server logs).
+- Disclaimer: https://swap.9summits.io/disclaimer.html (non-custodial interface, no accounts, no cookies, no trackers, no client-side analytics; keeps aggregate anonymous swap-outcome counters — venue, chain id, outcome — via server logs).
 
 ## Related files on this host
 

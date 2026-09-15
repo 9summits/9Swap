@@ -46,6 +46,7 @@ const HOSTED_STATIC_PATHS = new Set([
   "/docs",
   "/docs.html",
   "/docs.md",
+  "/disclaimer.html",
   "/terms.html",
   "/llms.txt",
   "/llms-full.txt",
@@ -75,7 +76,7 @@ export async function startServeSession(opts: ServeOptions = {}): Promise<void> 
       });
     }
 
-    // The footer's Docs / Terms links and the agent-discovery files. These
+    // The footer's Docs / Disclaimer links and the agent-discovery files. These
     // static files live in web/public and are not embedded in the binary —
     // redirect to the hosted copies instead of 404ing.
     if (HOSTED_STATIC_PATHS.has(path) && req.method === "GET")

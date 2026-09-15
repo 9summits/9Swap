@@ -6,7 +6,7 @@ const CONTACT_EMAIL = "contact@9summits.io";
 const GITHUB_URL = "https://github.com/9summits/9Swap";
 // Static pages served from web/public — same origin as the deployed dApp.
 const DOCS_URL = "/docs.html";
-const TERMS_URL = "/terms.html";
+const DISCLAIMER_URL = "/disclaimer.html";
 // Build-time short SHA from vite.config.ts (`git rev-parse --short` / Vercel).
 const APP_COMMIT =
   typeof __APP_COMMIT__ === "string" && __APP_COMMIT__ ? __APP_COMMIT__ : "unknown";
@@ -16,7 +16,7 @@ const COMMIT_URL =
     : GITHUB_URL;
 
 // Page footer for the interactive dApp: contact (click-to-copy email) + CLI
-// docs + terms/disclaimer + the short git commit of this dApp build (links
+// docs + disclaimer + the short git commit of this dApp build (links
 // to the matching GitHub commit), centered.
 export function SiteFooter() {
   const [copied, setCopied] = React.useState(false);
@@ -61,8 +61,8 @@ export function SiteFooter() {
         <span style={s.dot} aria-hidden>
           ·
         </span>
-        <a href={TERMS_URL} style={s.link}>
-          <span>Terms</span>
+        <a href={DISCLAIMER_URL} style={s.link}>
+          <span>Disclaimer</span>
         </a>
         <span style={s.dot} aria-hidden>
           ·

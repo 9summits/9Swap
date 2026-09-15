@@ -141,6 +141,11 @@
       "source": "/cli/:path*",
       "destination": "https://jng5l4649ewvi7zy.public.blob.vercel-storage.com/cli/:path*",
       "permanent": false
+    },
+    {
+      "source": "/terms.html",
+      "destination": "/disclaimer.html",
+      "permanent": true
     }
   ],
   "rewrites": [

@@ -251,4 +251,4 @@ Human-readable output goes to stdout; warnings and progress go to stderr, so `--
 - **Safety:** never coerce token decimals to 18; approve `tx.spender`, not `tx.to`; quote and build at the same slippage; a signed order must have been quoted with the real sender.
 
 ---
-Terms, risk & privacy: https://swap.9summits.io/terms.html · Contact: contact@9summits.io
+Disclaimer: https://swap.9summits.io/disclaimer.html · Contact: contact@9summits.io
