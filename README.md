@@ -1,7 +1,7 @@
 # swap
 
 **`swap`** is a terminal CLI that asks every major DEX aggregator (KyberSwap,
-Odos, Velora, 0x/Matcha, 1inch, Curve, OpenOcean, plus intent-based venues
+Velora, 0x/Matcha, 1inch, Curve, OpenOcean, plus intent-based venues
 like CoW (and its Ophis fork), UniswapX, Velora Delta, 1inch Fusion) for a
 swap quote on EVM chains, ranks the answers by token-out received, and —
 optionally — builds the executable calldata, checks your allowance, and
@@ -127,7 +127,7 @@ Common flags:
 |------|--------|
 | `-a, --action <action>` | `swap` (default — quote + build) or `send` (transfer the input token to `--to`, no DEX) |
 | `--to <addr>` | recipient address; required with `-a send` |
-| `-v <venue>` | one of `kyber`, `odos`, `odosv2`, `velora`, `matcha`, `1inch`, `curve`, `uniswap`, `openocean`, `cow`, `delta`, `uniswapx`, `fusion`, `ophis`, or `all` (default `all`). Comma-separated list also works — e.g. `-v kyber,odos,matcha` races just those three and prints a 3-row comparison block. Bypassed entirely when `tokenIn`/`tokenOut` are the native↔wrapped pair (auto wrap/unwrap) or `-a send` |
+| `-v <venue>` | one of `kyber`, `velora`, `matcha`, `1inch`, `curve`, `uniswap`, `openocean`, `cow`, `delta`, `uniswapx`, `fusion`, `ophis`, or `all` (default `all`). Comma-separated list also works — e.g. `-v kyber,velora,matcha` races just those three and prints a 3-row comparison block. Bypassed entirely when `tokenIn`/`tokenOut` are the native↔wrapped pair (auto wrap/unwrap) or `-a send` |
 | `--all` | alias for `-v all` (kept for muscle memory) |
 | `--allow-async` | include intent-based venues (`cow`, `delta`, `uniswapx`, `fusion`, `ophis`) — output is an EIP-712 order to sign + POST, not a tx |
 | `--chain <alias>` | `eth` (default), `arb`, `base`, `op`, `avax`, `bsc`, `hype`, `unichain`, `robinhood`, `monad`, `plasma`, `polygon`, `gnosis`, `ink` |
@@ -207,12 +207,8 @@ No allowance check in either direction — `withdraw()` operates on
 
 ## Venues
 
-Sync (broadcastable tx): `kyber`, `odos`, `odosv2`, `velora`, `matcha`,
-`1inch`, `curve`, `uniswap`, `openocean`.
-
-> `odos` and `odosv2` are **disabled** — Odos discontinued its app and API on
-> 2026-07-30. They no longer appear in `-v all` or the dApp, and selecting one
-> explicitly errors out. The adapters are kept in the tree for reference.
+Sync (broadcastable tx): `kyber`, `velora`, `matcha`, `1inch`, `curve`,
+`uniswap`, `openocean`.
 
 Async (intent / EIP-712 order): `cow`, `delta`, `uniswapx`, `fusion`, `ophis`.
 Require `--allow-async`. The build path produces an `order` payload to sign
@@ -293,8 +289,6 @@ quote wire.
 | `cow` | ✅ native | `kind: buy` order — needs `--allow-async` |
 | `ophis` | ✅ native | `kind: buy` order — needs `--allow-async` |
 | `kyber` | ♻️ refine | sell-only API; multi-venue seed only |
-| `odos` | — | discontinued |
-| `odosv2` | — | discontinued |
 | `1inch` | ♻️ refine | sell-only API; multi-venue seed only |
 | `curve` | ♻️ refine | sell-only (`get_dy` is exact-in) |
 | `openocean` | ♻️ refine | sell-only API; multi-venue seed only |
@@ -368,18 +362,17 @@ rejects non-checksummed addresses).
 ## Slippage
 
 `--slippage` is a percent. Default `0.1` (10 bps). The same value drives both
-the quote and the build — Odos in particular lets slippage steer route
-search, so quoting at one slippage and building at another would diverge.
+the quote and the build: some venues let slippage steer route search, so
+quoting at one slippage and building at another would diverge.
 
 ## Referral fees
 
-All five sync venues plus CoW support permissionless fee attribution. Set
+The sync venues and CoW support permissionless fee attribution. Set
 `REFERRAL_ADDRESS` to your recipient and optionally `REFERRAL_FEE_BPS` (1 bp
 = 0.01%, capped at 1000). Velora additionally enables `takeSurplus=true`
 whenever `REFERRAL_ADDRESS` is set — invisible to the user, skims positive
 slippage. Kyber also sends `feeReceiver` at 0 bps so the receiver is
-registered. Odos requires a separately-registered numeric code via
-`ODOS_REFERRAL_CODE`. See `.env.example` for the full set.
+registered. See `.env.example` for the full set.
 
 ## Examples
 
@@ -394,7 +387,7 @@ swap 1 WBTC ETH -v kyber
 swap 2 WETH stETH --all --allow-async
 
 # build broadcastable calldata
-swap 100 USDC USDT -v odos --from 0xMyAddr -d
+swap 100 USDC USDT -v kyber --from 0xMyAddr -d
 
 # simulate — actual tokenOut received against pranked balance
 swap 100 USDC USDT --from 0xMyAddr --simulate
