@@ -27,7 +27,7 @@ The CLI never blocks on stdin when it is not a TTY. This only matters for `--loc
 ```sh
 export ALCHEMY_API_KEY=…        # one key, every chain; needed for -d / --simulate / max / curve in local mode
 export SENDER_ADDRESS=0x…       # default --from
-# optional venue keys (local mode only): ZEROEX_API_KEY (matcha), ONEINCH_API_KEY (1inch, fusion), UNISWAP_API_KEY (uniswap, uniswapx), KYBER_API_KEY (kyber gateway, higher limits), OPENOCEAN_API_KEY (openocean enterprise host)
+# optional venue keys (local mode only): ZEROEX_API_KEY (matcha), ONEINCH_API_KEY (1inch, fusion), UNISWAP_API_KEY (uniswap, uniswapx), KYBER_API_KEY (kyber gateway, higher limits), OPENOCEAN_API_KEY (openocean pro host)
 ```
 
 Or `RPC_URL_<chainId>` (e.g. `RPC_URL_1`) for a specific RPC. Missing RPC config is a hard error that names the variable to set. The CLI has no public-RPC fallback (the hosted dApp last-resorts to PublicNode when Alchemy is unset).

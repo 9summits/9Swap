@@ -29,7 +29,7 @@ Set these in **Project → Settings → Environment Variables**:
 | `ONEINCH_API_KEY`         | Optional | Enables the 1inch and Fusion venues                                |
 | `UNISWAP_API_KEY`         | Optional | Enables Uniswap Classic and UniswapX venues                        |
 | `KYBER_API_KEY`           | Optional | Switches Kyber to the API gateway (`X-Api-Key`, higher limits). Unset → public keyless host (3 rps) |
-| `OPENOCEAN_API_KEY`       | Optional | Switches OpenOcean to the enterprise host (`apikey` header). Unset → public keyless host (2 rps) |
+| `OPENOCEAN_API_KEY`       | Optional | Switches OpenOcean to the pro host (`apikey` header). Unset → public keyless host (2 rps) |
 | `KYBER_API_BASE`          | Optional | Leave unset. Defaults: no key → `https://aggregator-api.kyberswap.com`; with `KYBER_API_KEY` → `https://api.kyberswap.com/swap`. Only set to hit a different host |
 | `KYBER_SOURCE`            | Optional | On-chain `source` in Kyber's ClientData event on `/route/build`. Attribution only |
 | `KYBER_REFERRAL`          | Optional | On-chain `referral` in Kyber's ClientData event. Attribution only |

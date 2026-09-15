@@ -257,7 +257,7 @@ attribution on the build. See `.env.example`.
 
 `openocean` is keyless on the public host (2 rps). An optional
 `OPENOCEAN_API_KEY` (https://docs.openocean.finance/docs/swap-api/enterprise)
-switches it to the enterprise host.
+switches it to the pro host.
 
 Venues without a key are skipped under `-v all` (a stderr note names the
 missing env vars). Querying them directly (`-v matcha`) raises a clear error

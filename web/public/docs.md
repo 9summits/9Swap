@@ -219,7 +219,7 @@ Config precedence: shell env → `.env` in the current directory → `~/.swap/co
 | `ONEINCH_API_KEY` | `1inch`, `fusion` (https://portal.1inch.dev) |
 | `UNISWAP_API_KEY` | `uniswap`, `uniswapx` (https://hub.uniswap.org) |
 | `KYBER_API_KEY` | `kyber` API gateway, higher rate limits (optional; from business@kyber.network). `KYBER_SOURCE` / `KYBER_REFERRAL` add on-chain attribution |
-| `OPENOCEAN_API_KEY` | `openocean` enterprise host, higher limits (optional; public host is keyless, 2 rps) |
+| `OPENOCEAN_API_KEY` | `openocean` pro host, higher limits (optional; public host is keyless, 2 rps) |
 | `OPHIS_REFERRAL_CODE` | `ophis` (skipped without it) |
 | `SENDER_ADDRESS` | default for `--from` |
 | `WALLETCONNECT_PROJECT_ID` | WalletConnect in `--browser` (injected wallets work without it) |

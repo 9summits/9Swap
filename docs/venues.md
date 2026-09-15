@@ -54,7 +54,7 @@ Sync vs. async: **sync** venues (`kyber`, `odos`, `odosv2`, `velora`, `matcha`,
   better quote (typically 1–3 bp better on stable-stable WETH/stETH-style legs).
   Quote via `POST /sor/quote/v2`, then the legacy two-step build: re-quote with
   `userAddr` to mint a fresh pathId → `POST /sor/assemble`. No API key, no
-  enterprise host.
+  pro host.
 - **Velora** — `POST /transactions/{chainId}?ignoreChecks=true&ignoreAllowance=true`
   with the `priceRoute` from `quote.raw`. Velora prices expire quickly — if the
   build fires more than ~30s after the quote you'll see `408 Price Timeout`; just
@@ -75,8 +75,8 @@ Sync vs. async: **sync** venues (`kyber`, `odos`, `odosv2`, `velora`, `matcha`,
 - **OpenOcean** — Swap API v4. Keyless on the public host
   (`open-api.openocean.finance`, 2 rps); Cloudflare 403s headerless CLI fetch,
   so the adapter sends `Origin`/`Referer` matching `app.openocean.finance`.
-  With `OPENOCEAN_API_KEY` it switches to the enterprise host
-  (`open-api-enterprise.openocean.finance`, `apikey` header). Chains:
+  With `OPENOCEAN_API_KEY` it switches to the pro host
+  (`open-api-pro.openocean.finance`, `apikey` header). Chains:
   eth/bsc/base/arb/avax/polygon/xdai (short chain codes in the URL path). Uses the wei-denominated
   `amountDecimals` / `gasPriceDecimals` params (the legacy human-unit params
   are deprecated); slippage is in **percent**; the native sentinel is already
@@ -396,7 +396,7 @@ NormalizedPermitTx` and `kind: "permit-tx"` (mutually exclusive with `tx` /
   RPC config as `-d`/`--simulate` (never public RPCs).
 - **OpenOcean** — `GET https://open-api.openocean.finance/v4/{chain}/{quote,swap}`
   (no key, 2 rps; `Origin`/`Referer` for Cloudflare). With `OPENOCEAN_API_KEY`,
-  `GET https://open-api-enterprise.openocean.finance/v4/{chain}/{quote,swap}`
+  `GET https://open-api-pro.openocean.finance/v4/{chain}/{quote,swap}`
   and the `apikey` header.
 - **Ophis orderbook** — CoW-compatible orderbook API (`POST /api/v1/quote`,
   `PUT /api/v1/app_data/{hash}`, order submit). Base URL is per-chain via
@@ -459,7 +459,7 @@ anything. Env vars (all optional, all in `.env.example`):
 | Venue   | Quote-side                                           | Build-side                                                                                       | Surplus capture |
 |---------|------------------------------------------------------|--------------------------------------------------------------------------------------------------|-----------------|
 | velora  | `partner`, `partnerAddress`, `partnerFeeBps`, `takeSurplus` | same, in JSON body                                                                          | `takeSurplus=true` whenever `REFERRAL_ADDRESS` is set — invisible to user, doesn't alter quote |
-| odos    | *disabled 2026-07-30* — `partnerFeePercent`, `feeRecipient` (V3 — only honored on enterprise host) | same on `/sor/quote/v3` re-quote                                  | n/a |
+| odos    | *disabled 2026-07-30* — `partnerFeePercent`, `feeRecipient` (V3 — only honored on pro host) | same on `/sor/quote/v3` re-quote                                  | n/a |
 | odosv2  | *disabled 2026-07-30* — `referralCode` (legacy V2 mechanism, sourced from `ODOS_REFERRAL_CODE`) | same on `/sor/quote/v2` re-quote before `/sor/assemble`              | n/a |
 | kyber   | `x-client-id` header; partner-fee quartet (`feeReceiver`, `feeAmount` BPS including 0, `isInBps=true`, `chargeFeeBy=currency_out`) whenever `REFERRAL_ADDRESS` is set | same quartet on `/route/build`; optional `source` and `referral` (from `KYBER_SOURCE` and `KYBER_REFERRAL`) recorded in the on-chain `ClientData` event, attribution only, kept under `--nofee` | quartet at 0 bps registers `feeReceiver`; Kyber's docs still say they keep positive slippage |
 | matcha  | `swapFeeRecipient`, `swapFeeBps`, `swapFeeToken=buyToken` on `/allowance-holder/price` — `buyAmount` comes back **net**, and the `fees` breakdown is surfaced as `protocolFee` | same on `/allowance-holder/quote`                                | `tradeSurplusRecipient` whenever `REFERRAL_ADDRESS` is set (honored only once 0x enables surplus on the API key) |
