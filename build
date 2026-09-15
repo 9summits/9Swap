@@ -12,21 +12,29 @@ mkdir -p dist
 
 EMBEDDED_TS="src/env.embedded.ts"
 EMBEDDED_BACKUP="$(mktemp)"
+BUILD_INFO_TS="src/build_info.ts"
+BUILD_INFO_BACKUP="$(mktemp)"
 
 # If a .env exists, bake its values into src/env.embedded.ts before the
 # compile so the resulting binary works from any directory without
 # requiring the user to copy .env around. The values become a fallback —
 # shell env and a CWD .env still override at runtime.
 #
-# Restore the empty stub on exit so the working tree stays clean (and so
+# src/build_info.ts gets the same treatment with the build's commit sha
+# (see below), so `swap --version` names an exact revision.
+#
+# Restore both stubs on exit so the working tree stays clean (and so
 # the next dev `bun run` doesn't pick up stale embedded values).
 cleanup() {
   cp "$EMBEDDED_BACKUP" "$EMBEDDED_TS"
   rm -f "$EMBEDDED_BACKUP"
+  cp "$BUILD_INFO_BACKUP" "$BUILD_INFO_TS"
+  rm -f "$BUILD_INFO_BACKUP"
 }
 trap cleanup EXIT INT TERM
 
 cp "$EMBEDDED_TS" "$EMBEDDED_BACKUP"
+cp "$BUILD_INFO_TS" "$BUILD_INFO_BACKUP"
 
 # Embed policy:
 #   default build          → bake `.env` if present (local/dev binary)
@@ -57,6 +65,11 @@ if [ -d web ]; then
   echo "building web/ singlefile bundle..." >&2
   (cd web && bun run build > /dev/null 2>&1)
 fi
+
+# Stamp the commit sha + UTC date the binary is built from. No git (tarball
+# checkout) → both stay null and `swap --version` says "unknown build";
+# never a build failure.
+bun scripts/build-info.ts > "$BUILD_INFO_TS"
 
 bun build src/index.ts \
   --compile \

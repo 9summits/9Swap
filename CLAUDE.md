@@ -31,6 +31,8 @@ src/trade_side.ts    sell/buy side, BUY_CAPABLE_VENUES; src/slippage.ts min-out/
 src/format.ts json.ts   terminal + JSON renderers (consume only NormalizedQuote)
 src/wrap.ts send.ts unstake_savax.ts claim_savax.ts   short-circuit actions (skip the venue loop)
 src/simulate.ts      --simulate (eth_simulateV1 prank); src/gas_usd.ts gas-USD fallback
+src/version.ts       `--version`: CLI_VERSION (package.json), resolveBuildInfo (git fallback in dev), formatVersion
+src/build_info.ts    build sha + UTC date, null in source; regenerated at build time, restored right after
 src/rpc.ts checksum.ts env.ts referral.ts   RPC resolution, EIP-55, .env, partner fees
 src/venues/          per-venue adapters + dispatcher (fetchAllQuotes, pickBest, build)
 src/browser.ts serve.ts server/   --browser bridge, dApp server, stateless handlers

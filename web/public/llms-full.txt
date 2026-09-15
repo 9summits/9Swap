@@ -204,6 +204,7 @@ There is **no** public `/api/balances` — balances are read client-side via the
 | `--hosted` | Quote and build through this host's `/api/*` for this run, no venue key or RPC needed except `--simulate` |
 | `--local` | Force the local venue engine for this run even if `SWAP_API_URL` is set (`SWAP_API_DISABLED=true` does the same from the environment) |
 | `--show-mode` | Print the effective mode (`hosted <base>` or `self-hosted`) on stdout and exit, without quoting; honours `--hosted` / `--local` passed alongside |
+| `-V` / `--version` | Print the version and the commit the binary was built from (`swap 0.1.0 (2c02339, 2026-09-15)`) and exit, without quoting or any network call |
 
 ## Safety rules agents should respect
 

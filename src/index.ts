@@ -121,6 +121,7 @@ import {
 import { isBuyCapable, type TradeSide } from "./trade_side.ts";
 import { maxAmountIn } from "./slippage.ts";
 import { runUpdate } from "./update.ts";
+import { CLI_VERSION, formatVersion, resolveBuildInfo } from "./version.ts";
 import { fetchUsdPrices } from "../web/src/dapp/cgPrices.ts";
 import {
   GROSS,
@@ -483,6 +484,15 @@ async function main(): Promise<void> {
       "DEX aggregator quotes (kyber | odos | velora | matcha | 1inch | all) from the terminal.\n" +
         "Run `swap --init` once to configure your Alchemy key / RPC URL (saved to ~/.swap).\n" +
         "Run `swap update` to replace this binary with the latest public prebuilt.",
+    )
+    // Commander handles `-V` / `--version` while parsing options, before the
+    // required positionals are checked, so `swap --version` prints and exits 0
+    // on its own. The sha comes from src/build_info.ts in a compiled binary
+    // (stamped by ./build) and from git in a dev run.
+    .version(
+      formatVersion({ version: CLI_VERSION, ...resolveBuildInfo() }),
+      "-V, --version",
+      "print version and build commit",
     )
     .argument("<amount>", "amount of tokenIn (or tokenOut with --exact-out), e.g. 1 or 0.25")
     .argument("<tokenIn>", "symbol (WBTC) or 0x address")

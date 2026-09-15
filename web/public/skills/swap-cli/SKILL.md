@@ -46,7 +46,10 @@ swap 100 USDC USDT --from 0x… --simulate    # eth_simulateV1 dry-run: real tok
 swap 1 ETH WETH --from 0x… -d               # wrap (direct WETH9 deposit, no venue)
 swap 100 USDC -a send --to 0x… --from 0x… -d   # plain transfer, no DEX
 swap 0.1 WETH USDC --from 0x… --browser     # hand to a human wallet via local RainbowKit page
+swap --version                              # version + build commit, e.g. swap 0.1.0 (2c02339, 2026-09-15)
 ```
+
+`--version` (`-V`) takes no positional argument, makes no network call, and exits 0. Include its output when reporting a problem: it names the exact commit the installed binary was built from (`unknown build` when the binary carries no git metadata).
 
 Tokens: symbol (case-insensitive) or `0x` address. Amounts: human units; `max` = whole balance (needs `--from` + RPC). Slippage: `--slippage 0.5` (percent, default `0.1`).
 

@@ -24,6 +24,19 @@ bun run typecheck      # tsc --noEmit on the whole project
 bun run test                     # all unit tests (tests/*.test.ts)
 bun test tests/hops_approx.test.ts   # a single file
 bun test tests/hosted_mode.test.ts   # hosted mode (--hosted / --local / SWAP_API_URL / SWAP_API_DISABLED) offline unit tests
+bun test tests/version.test.ts       # `swap --version` formatting + the build-info stamper
+```
+
+`tests/version.test.ts` covers `formatVersion` in its three shapes
+(`swap 0.1.0 (sha, date)`, `swap 0.1.0 (sha)`, `swap 0.1.0 (unknown build)`),
+checks `CLI_VERSION` against `package.json` and that `resolveBuildInfo()`
+never throws, then runs `scripts/build-info.ts` against the current checkout
+and asserts the emitted module carries this repo's short sha (skipped when git
+cannot answer, as in a tarball checkout). To check the stamped binary itself:
+
+```bash
+./build && ./dist/swap --version     # swap 0.1.0 (<sha>, <YYYY-MM-DD>)
+git status --porcelain src/build_info.ts src/env.embedded.ts   # empty: both stubs restored
 ```
 
 `tests/hosted_mode.test.ts` stubs `fetch` and covers `src/remote.ts` end to

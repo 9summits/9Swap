@@ -142,6 +142,7 @@ Common flags:
 | `--hosted` | quote and build through the hosted API (`https://swap.9summits.io`) for this run instead of the local engine; no venue key, no RPC except `--simulate`; mutually exclusive with `--local` |
 | `--local` | force the local engine for this run even when `SWAP_API_URL` is set, using your own venue keys and RPC |
 | `--show-mode` | print the effective mode (`hosted <base>` or `self-hosted`) on stdout and exit, without quoting |
+| `-V`, `--version` | print the version and the commit the binary was built from (`swap 0.1.0 (2c02339, 2026-09-15)`) and exit, without quoting |
 
 ## Output modes
 

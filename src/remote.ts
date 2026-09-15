@@ -15,12 +15,12 @@
 //     is the same reasoning as the no-public-RPC-fallback rule: silently
 //     swapping the execution backend under the user is worse than failing with
 //     the exact flag to pass (`--local`).
-import pkg from "../package.json";
 import type { ChainInfo } from "./chains.ts";
 import { API_VERSION } from "./server/shared.ts";
 import type { ApprovalForBrowser, Payload } from "./server/shared.ts";
 import type { Token } from "./tokens.ts";
 import type { TradeSide } from "./trade_side.ts";
+import { CLI_VERSION, resolveBuildInfo } from "./version.ts";
 import { VENUES } from "./venues/index.ts";
 import type {
   BuildResult,
@@ -35,19 +35,29 @@ import type {
 /** Public deployment the `--hosted` flag points at. */
 export const HOSTED_DEFAULT = "https://swap.9summits.io";
 
-const CLI_VERSION = (pkg as { version?: string }).version ?? "0.0.0";
-
 // Every hosted request is tagged so the deployment can tell CLI traffic from
 // browser traffic in its logs (and rate-limit them separately if it ever needs
-// to). No secret, no address, nothing user-identifying.
-const CLIENT_HEADERS: Record<string, string> = {
-  "user-agent": `swap-cli/${CLI_VERSION}`,
-  "x-swap-client": "cli",
-};
+// to). The build commit rides along as `swap-cli/<version>+<sha>` when it is
+// known, so a misbehaving prebuilt can be traced to a revision. No secret, no
+// address, nothing user-identifying.
+//
+// Built lazily (and memoised) because resolving the sha can mean one
+// `git rev-parse` in a dev checkout — not something to pay for on import.
+let clientHeaders: Record<string, string> | null = null;
+
+function headers(): Record<string, string> {
+  if (clientHeaders) return clientHeaders;
+  const { sha } = resolveBuildInfo();
+  clientHeaders = {
+    "user-agent": `swap-cli/${CLI_VERSION}${sha ? `+${sha}` : ""}`,
+    "x-swap-client": "cli",
+  };
+  return clientHeaders;
+}
 
 /** The same identification headers, for the `--browser` proxy in browser.ts. */
 export function cliClientHeaders(): Record<string, string> {
-  return { ...CLIENT_HEADERS };
+  return { ...headers() };
 }
 
 // How many intermediary hop addresses we are willing to resolve one-by-one
@@ -212,7 +222,7 @@ async function hostedFetch(
     res = await fetch(url, {
       ...init,
       headers: {
-        ...CLIENT_HEADERS,
+        ...headers(),
         ...((init?.headers as Record<string, string> | undefined) ?? {}),
       },
     });

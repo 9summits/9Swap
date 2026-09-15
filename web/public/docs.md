@@ -56,6 +56,7 @@ swap [options] <amount> <tokenIn> [tokenOut]
 | `--hosted` | Quote and build through the hosted API (`https://swap.9summits.io`) instead of the local engine, for this run. No venue key, no RPC (except `--simulate`). Nothing is signed remotely. Mutually exclusive with `--local`. |
 | `--local` | Force the local engine for this run even when `SWAP_API_URL` is set. Uses your own venue keys and RPC. |
 | `--show-mode` | Print the effective mode (`hosted <base>` or `self-hosted`) on stdout and exit, without quoting. Takes no positional argument; `--hosted` / `--local` alongside it are honoured. |
+| `-V, --version` | Print the version and the commit the binary was built from, e.g. `swap 0.1.0 (2c02339, 2026-09-15)`, then exit. Takes no positional argument and makes no network call. A build with no git metadata prints `swap 0.1.0 (unknown build)`. |
 
 ## 03 · Quoting
 

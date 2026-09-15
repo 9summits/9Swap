@@ -26,14 +26,19 @@ mkdir -p dist
 
 EMBEDDED_TS="src/env.embedded.ts"
 EMBEDDED_BACKUP="$(mktemp)"
+BUILD_INFO_TS="src/build_info.ts"
+BUILD_INFO_BACKUP="$(mktemp)"
 
 cleanup() {
   cp "$EMBEDDED_BACKUP" "$EMBEDDED_TS"
   rm -f "$EMBEDDED_BACKUP"
+  cp "$BUILD_INFO_BACKUP" "$BUILD_INFO_TS"
+  rm -f "$BUILD_INFO_BACKUP"
 }
 trap cleanup EXIT INT TERM
 
 cp "$EMBEDDED_TS" "$EMBEDDED_BACKUP"
+cp "$BUILD_INFO_TS" "$BUILD_INFO_BACKUP"
 
 # Embed policy — see ./build. Public builds bake `.env.install` (not `.env`).
 if [ "${SWAP_PUBLIC_BUILD:-}" = "1" ]; then
@@ -72,6 +77,10 @@ TARGETS=(
   "bun-darwin-arm64:swap-darwin-arm64"
   "bun-windows-x64:swap-windows-x64.exe"
 )
+
+# Stamp the commit sha + UTC date once — every target shares it. Restored by
+# `cleanup`; see ./build and src/build_info.ts.
+bun scripts/build-info.ts > "$BUILD_INFO_TS"
 
 for entry in "${TARGETS[@]}"; do
   target="${entry%%:*}"

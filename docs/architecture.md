@@ -36,6 +36,8 @@ src/
   unstake_savax.ts  -a unstakesavax — BENQI sAVAX requestUnlock; exports SAVAX_AVAX + getPooledAvaxByShares
   claim_savax.ts    -a claimsavax — BENQI sAVAX redeem() of matured unlocks; discoverClaimableSavax reads/classifies queued requests
   gas_usd.ts        post-fetch USD-fill for venues whose API doesn't return one (matcha, 1inch, curve heuristic)
+  version.ts        `swap --version`: CLI_VERSION (package.json), resolveBuildInfo (BUILD_INFO, else git in dev), formatVersion
+  build_info.ts     build commit sha + UTC date; null in source, regenerated at build time by scripts/build-info.ts and restored right after
   venues/
     types.ts        NormalizedQuote / NormalizedTx / NormalizedOrder / NormalizedPermitTx shapes, Venue union, VENUES/VENUE_OPTIONS
     index.ts        dispatcher: fetchQuote(venue,…), fetchAllQuotes, pickBest, build, assemblePermitTx
