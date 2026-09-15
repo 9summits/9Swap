@@ -141,6 +141,7 @@ Common flags:
 | `-s`, `--simple` | print only the numeric `amountOut` for shell piping |
 | `--hosted` | quote and build through the hosted API (`https://swap.9summits.io`) for this run instead of the local engine; no venue key, no RPC except `--simulate`; mutually exclusive with `--local` |
 | `--local` | force the local engine for this run even when `SWAP_API_URL` is set, using your own venue keys and RPC |
+| `--show-mode` | print the effective mode (`hosted <base>` or `self-hosted`) on stdout and exit, without quoting |
 
 ## Output modes
 
@@ -314,6 +315,11 @@ Resolution order: `--local` > `--hosted` > `SWAP_API_DISABLED=true` >
 `SWAP_API_URL=https://swap.9summits.io`. To self-host with your own venue keys
 and RPC, pass `--local` for one run, set `SWAP_API_DISABLED=true`, or clear
 `SWAP_API_URL` (unset it in the shell, `.env`, or `~/.swap/config`).
+
+`swap --show-mode` prints which backend the current configuration resolves to,
+one line on stdout: `hosted https://swap.9summits.io` or `self-hosted`. It takes
+no positional argument and never quotes, and `--hosted` / `--local` alongside it
+are honoured (`swap --show-mode --local` prints `self-hosted`).
 
 | Variable | Default | Effect |
 |----------|---------|--------|

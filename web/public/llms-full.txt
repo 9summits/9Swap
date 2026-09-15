@@ -23,7 +23,7 @@ This file expands [/llms.txt](https://swap.9summits.io/llms.txt) with enough det
 
 The `swap` CLI resolves its backend in this order: `--local` > `--hosted` > `SWAP_API_DISABLED=true` > `SWAP_API_URL` env var > local engine. `--hosted` forces this host (`https://swap.9summits.io`) for one run; `--local` forces the local venue engine (the user's own keys and RPC) even when `SWAP_API_URL` is set. `SWAP_API_DISABLED` (default `false`) does the same persistently from the environment, so the URL embedded in the public binary can be opted out of without clearing it; it accepts `1`/`true`/`yes`/`on` and `0`/`false`/`no`/`off`, and any other value is a hard error. The public prebuilt binary embeds `SWAP_API_URL=https://swap.9summits.io`, so it is hosted unless the user opts out.
 
-In hosted mode the CLI never signs anything (unchanged from local mode): it renders whatever the API returns. `--nofee` is refused (fee policy is server-side, not the client's to zero); the venue list is whatever `GET /api/mode` reports (this host omits `curve`); a `GET /api/mode.apiVersion` mismatch with the CLI's expected version fails with "hosted API contract mismatch … run `swap update`" rather than degrading silently. `--simulate` and the local-only actions (`send`, `unwrapwrseth`, `withdrawsparkweth`, `unstakesavax`, `claimsavax`) always run against the caller's own RPC, hosted or not. A rate-limited (429) or unreachable API fails loud, naming `--local` as the escape hatch, never falling back silently.
+In hosted mode the CLI never signs anything (unchanged from local mode): it renders whatever the API returns. `--nofee` is refused (fee policy is server-side, not the client's to zero); the venue list is whatever `GET /api/mode` reports (this host omits `curve`); a `GET /api/mode.apiVersion` mismatch with the CLI's expected version fails with "hosted API contract mismatch … run `swap update`" rather than degrading silently. `--simulate` and the local-only actions (`send`, `unwrapwrseth`, `withdrawsparkweth`, `unstakesavax`, `claimsavax`) always run against the caller's own RPC, hosted or not. A rate-limited (429) or unreachable API fails loud, naming `--local` as the escape hatch, never falling back silently. `swap --show-mode` prints which backend the current configuration resolves to (`hosted <base>` or `self-hosted`) and exits, without quoting.
 
 ## Surfaces
 
@@ -203,6 +203,7 @@ There is **no** public `/api/balances` — balances are read client-side via the
 | `-a send` | Transfer instead of swap |
 | `--hosted` | Quote and build through this host's `/api/*` for this run, no venue key or RPC needed except `--simulate` |
 | `--local` | Force the local venue engine for this run even if `SWAP_API_URL` is set (`SWAP_API_DISABLED=true` does the same from the environment) |
+| `--show-mode` | Print the effective mode (`hosted <base>` or `self-hosted`) on stdout and exit, without quoting; honours `--hosted` / `--local` passed alongside |
 
 ## Safety rules agents should respect
 

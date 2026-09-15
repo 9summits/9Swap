@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   HOSTED_DEFAULT,
+  describeMode,
   remoteMode,
   remoteResolveToken,
   resolveApiBase,
@@ -88,6 +89,18 @@ describe("resolveApiBase", () => {
     expect(() =>
       resolveApiBase({ env: { SWAP_API_URL: "file:///etc/passwd" } }),
     ).toThrow(/http\(s\)/);
+  });
+});
+
+// ───────────────────────────── describeMode ─────────────────────────────────
+
+describe("describeMode", () => {
+  test("a resolved base → `hosted <base>`", () => {
+    expect(describeMode(HOSTED_DEFAULT)).toBe(`hosted ${HOSTED_DEFAULT}`);
+  });
+
+  test("no base → `self-hosted`", () => {
+    expect(describeMode(null)).toBe("self-hosted");
   });
 });
 

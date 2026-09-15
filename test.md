@@ -30,7 +30,8 @@ bun test tests/hosted_mode.test.ts   # hosted mode (--hosted / --local / SWAP_AP
 end without a network call: `resolveApiBase` precedence
 (`--local` > `--hosted` > `SWAP_API_DISABLED=true` > `SWAP_API_URL` >
 local engine, including the strict boolean parsing of `SWAP_API_DISABLED`),
-the wire to
+`describeMode` (the `swap --show-mode` line: `hosted <base>` vs.
+`self-hosted`), the wire to
 `NormalizedQuote` mapping (`routeQuoteToNormalized`), the NDJSON stream
 reader (`venueResultsFromNdjson`, including a line split across chunk
 boundaries), the `apiVersion` mismatch check, and the 429 / unreachable-API

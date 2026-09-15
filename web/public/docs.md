@@ -55,6 +55,7 @@ swap [options] <amount> <tokenIn> [tokenOut]
 | `--disableodosrfq`, `--odosnotcompact` | Odos workarounds (venue discontinued; kept for reference). |
 | `--hosted` | Quote and build through the hosted API (`https://swap.9summits.io`) instead of the local engine, for this run. No venue key, no RPC (except `--simulate`). Nothing is signed remotely. Mutually exclusive with `--local`. |
 | `--local` | Force the local engine for this run even when `SWAP_API_URL` is set. Uses your own venue keys and RPC. |
+| `--show-mode` | Print the effective mode (`hosted <base>` or `self-hosted`) on stdout and exit, without quoting. Takes no positional argument; `--hosted` / `--local` alongside it are honoured. |
 
 ## 03 · Quoting
 
@@ -232,12 +233,14 @@ By default the public binary quotes and builds through `https://swap.9summits.io
 
 Resolution order: `--local` > `--hosted` > `SWAP_API_DISABLED=true` > `SWAP_API_URL` env var > local engine. The public prebuilt binary embeds `SWAP_API_URL=https://swap.9summits.io`. To self-host: pass `--local` for one run, set `SWAP_API_DISABLED=true`, or clear `SWAP_API_URL` (unset it in the shell, `.env`, or `~/.swap/config`), and configure your own venue keys and RPC.
 
+`swap --show-mode` prints which backend the current configuration resolves to, one line on stdout: `hosted https://swap.9summits.io` or `self-hosted`. It never quotes, and `swap --show-mode --local` prints `self-hosted`.
+
 | Variable | Default | Effect |
 |----------|---------|--------|
 | `SWAP_API_URL` | `https://swap.9summits.io` (embedded in the public binary) | Base URL of the `/api/*` deployment the CLI quotes and builds through. Empty/unset disables hosted mode |
 | `SWAP_API_DISABLED` | `false` | `true` forces the local engine with your own keys and RPC even when `SWAP_API_URL` is set, so the embedded URL can be opted out of without clearing it. Accepts `1`/`true`/`yes`/`on` and `0`/`false`/`no`/`off`; any other value is an error |
 
-Hosted specifics: `--nofee` is refused (fee policy is server-side); the offered venue list comes from `GET /api/mode` and omits `curve`; a `hosted  quotes and tx build via <base>` line marks every run on stderr; a rate-limited request (429) reports the retry delay; an unreachable API fails loud and suggests `--local` rather than falling back silently; a stale binary whose `apiVersion` no longer matches the deployment fails with `hosted API contract mismatch … run swap update`. No telemetry is added by hosted mode (the CLI still never calls `/done`), but the server does see the caller's IP, the pair, the amounts, and the `--from` address on a build, the same as the web dApp.
+Hosted specifics: `--nofee` is refused (fee policy is server-side); the offered venue list comes from `GET /api/mode` and omits `curve`; a rate-limited request (429) reports the retry delay; an unreachable API fails loud and suggests `--local` rather than falling back silently; a stale binary whose `apiVersion` no longer matches the deployment fails with `hosted API contract mismatch … run swap update`. No telemetry is added by hosted mode (the CLI still never calls `/done`), but the server does see the caller's IP, the pair, the amounts, and the `--from` address on a build, the same as the web dApp.
 
 ## 10 · Output & scripting
 

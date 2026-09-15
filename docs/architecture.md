@@ -156,8 +156,14 @@ split across two network chunks.
 
 The CLI never signs in hosted mode, same as local: it only renders what the
 API returns. `--nofee` is refused when hosted (fee policy is server-side);
-the only extra output is a stderr line, `hosted  quotes and tx build via
-<base>`. Offline coverage lives in `tests/hosted_mode.test.ts`: it stubs
+a hosted run is otherwise indistinguishable in output from a local one.
+`swap --show-mode` is the way to tell them apart: handled in the
+pre-commander block right after `loadDotenv()` (so it needs no positional and
+sees a build-embedded `SWAP_API_URL`), it resolves the same
+`resolveApiBase({hosted, local})` and prints `describeMode`'s single line —
+`hosted <base>` or `self-hosted` — on stdout, then exits 0. It is also
+declared as a commander option so it shows in `--help`. Offline coverage
+lives in `tests/hosted_mode.test.ts`: it stubs
 `fetch` and exercises base resolution, the wire mapping, the NDJSON reader
 (split chunk boundaries included), and the 429 / network / contract-mismatch
 error paths.

@@ -67,6 +67,7 @@ import {
 } from "./browser.ts";
 import {
   HOSTED_DEFAULT,
+  describeMode,
   remoteBuild,
   remoteMode,
   remoteQuoteAll,
@@ -392,6 +393,26 @@ async function main(): Promise<void> {
 
   loadDotenv();
 
+  // `swap --show-mode` prints the effective backend and exits — one stdout
+  // line, no quote, no network call. Handled before commander so it works
+  // without the required <amount> positional, and after loadDotenv() so the
+  // value embedded in a public build (`.env.install` → EMBEDDED_ENV) counts.
+  // `--hosted` / `--local` passed alongside still beat the environment, and an
+  // invalid SWAP_API_DISABLED throws into the top-level catch like any other
+  // error (`✗ …`, exit 1) rather than printing a mode it could not resolve.
+  const modeArgs = process.argv.slice(2);
+  if (modeArgs.includes("--show-mode")) {
+    console.log(
+      describeMode(
+        resolveApiBase({
+          hosted: modeArgs.includes("--hosted"),
+          local: modeArgs.includes("--local"),
+        }),
+      ),
+    );
+    return;
+  }
+
   // `swap --init` is a standalone subcommand: prompt for RPC config
   // unconditionally (force=true), write ~/.swap, and exit. Handled
   // before commander parses so we don't trip the required <amount>
@@ -543,6 +564,12 @@ async function main(): Promise<void> {
       "force the local engine even when SWAP_API_URL is set — uses your own venue keys and RPC",
       false,
     )
+    // Handled before commander parses (it must work without the positionals);
+    // declared here only so it shows up in --help and isn't rejected as unknown.
+    .option(
+      "--show-mode",
+      "print the effective mode (hosted <base> or self-hosted) and exit",
+    )
     .showHelpAfterError()
     .action(
       async (
@@ -572,6 +599,8 @@ async function main(): Promise<void> {
           exactOut: boolean;
           hosted: boolean;
           local: boolean;
+          // Consumed before commander parses; declared for completeness.
+          showMode?: boolean;
           showcustomhelp?: boolean;
         },
       ) => {
@@ -742,14 +771,6 @@ async function main(): Promise<void> {
               "Use --local with your own keys",
           );
         }
-        if (hostedSwap) {
-          // stderr, never stdout — `--simple` pipes a bare number and `--json`
-          // must stay a single parseable object.
-          process.stderr.write(
-            `  ${pc.cyan("hosted")}  ${pc.dim(`quotes and tx build via ${apiBase}`)}\n`,
-          );
-        }
-
         // --rpc <url>: install the override before any RPC consumer runs.
         // Validate as a URL up front so a malformed value fails fast instead
         // of bleeding into venue/curve init with a cryptic error.

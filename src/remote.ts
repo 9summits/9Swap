@@ -109,6 +109,16 @@ export function resolveApiBase(
   return normalizeBase(raw);
 }
 
+/**
+ * One-line summary of the resolved backend, for `swap --show-mode`.
+ *
+ * `hosted <base>` when quotes and builds go through a deployment,
+ * `self-hosted` when the local venue engine (own keys + RPC) runs the show.
+ */
+export function describeMode(base: string | null): string {
+  return base === null ? "self-hosted" : `hosted ${base}`;
+}
+
 function normalizeBase(raw: string): string {
   let parsed: URL;
   try {

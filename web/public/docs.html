@@ -815,6 +815,15 @@
                 RPC.
               </td>
             </tr>
+            <tr>
+              <td><code>--show-mode</code></td>
+              <td>
+                Print the effective mode (<code>hosted &lt;base&gt;</code> or
+                <code>self-hosted</code>) on stdout and exit, without quoting.
+                Takes no positional argument; <code>--hosted</code> /
+                <code>--local</code> alongside it are honoured.
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -1358,6 +1367,13 @@
         <code>SWAP_API_URL</code> (unset it in the shell, <code>.env</code>, or
         <code>~/.swap/config</code>), and configure your own venue keys and RPC.
       </p>
+      <p>
+        <code>swap --show-mode</code> prints which backend the current
+        configuration resolves to, one line on stdout:
+        <code>hosted https://swap.9summits.io</code> or
+        <code>self-hosted</code>. It never quotes, and
+        <code>swap --show-mode --local</code> prints <code>self-hosted</code>.
+      </p>
       <div class="tablewrap">
         <table>
           <thead>
@@ -1385,9 +1401,7 @@
         Hosted specifics: <code>--nofee</code> is refused (fee policy is
         server-side); the offered venue list comes from
         <code>GET /api/mode</code> and omits <code>curve</code>; a
-        <code>hosted&nbsp;&nbsp;quotes and tx build via &lt;base&gt;</code>
-        line marks every run on stderr; a rate-limited request (429) reports
-        the retry delay; an unreachable API fails loud and suggests
+        rate-limited request (429) reports the retry delay; an unreachable API fails loud and suggests
         <code>--local</code> rather than falling back silently; a stale binary
         whose <code>apiVersion</code> no longer matches the deployment fails
         with <code>hosted API contract mismatch … run swap update</code>. No
