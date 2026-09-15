@@ -24,7 +24,10 @@ const PROJECT_ROOT = resolve(dirname(import.meta.dir));
 // state says nothing about the source the binary was built from.
 const BUILD_REWRITTEN = new Set(["src/build_info.ts", "src/env.embedded.ts"]);
 
-function git(args: string[]): string | null {
+// `trim` must stay off for porcelain output: a leading space is significant
+// there (" M path" = modified in the worktree), and trimming the whole
+// buffer would eat it on the first line and misparse the path.
+function git(args: string[], opts: { trim?: boolean } = {}): string | null {
   try {
     const proc = Bun.spawnSync(["git", ...args], {
       cwd: PROJECT_ROOT,
@@ -32,7 +35,8 @@ function git(args: string[]): string | null {
       stderr: "pipe",
     });
     if (proc.exitCode !== 0) return null;
-    return proc.stdout.toString().trim();
+    const out = proc.stdout.toString();
+    return opts.trim === false ? out : out.trim();
   } catch {
     // No git binary at all — not an error, just no provenance.
     return null;
@@ -41,7 +45,7 @@ function git(args: string[]): string | null {
 
 /** True when `git status --porcelain` lists anything the build didn't rewrite. */
 function isDirty(): boolean {
-  const status = git(["status", "--porcelain"]);
+  const status = git(["status", "--porcelain"], { trim: false });
   if (status === null) return false;
   for (const raw of status.split("\n")) {
     if (!raw.trim()) continue;
