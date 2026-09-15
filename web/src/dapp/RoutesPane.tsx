@@ -1,6 +1,7 @@
 import React from "react";
 import type { RoutesPaneProps, RouteQuote } from "./types";
 import { vmeta, vlogo, formatUnits, formatUsd } from "./venues";
+import { humanVenueReason } from "./venueReason";
 import { Icon } from "./icons";
 import { Badge } from "../ds/components/Badge";
 import { Switch } from "../ds/components/Switch";
@@ -533,28 +534,13 @@ function UnavailableVenues({
             />
             <span style={d.unavailLabel}>{vmeta(it.venue).label}</span>
             <span style={d.unavailReason} title={it.reason}>
-              {shortReason(it.reason)}
+              {humanVenueReason(it.venue, it.reason)}
             </span>
           </div>
         ))}
       </div>
     </div>
   );
-}
-
-// Condense a venue error into a compact one-liner for the unavailable list.
-function shortReason(reason: string): string {
-  const r = reason.toLowerCase();
-  if (r.includes("native eth") || r.includes("native token") || r.includes("wrap to"))
-    return "native input — wrap to WETH first";
-  if (r.includes("api key") || r.includes("api-key") || r.includes("missing"))
-    return "needs an API key";
-  if (r.includes("does not support") || r.includes("unsupported"))
-    return "unsupported for this pair";
-  if (r.includes("consume this service")) return "rate-limited";
-  // Fall back to the first clause, trimmed.
-  const head = reason.split(/[—\-:]/)[0]!.trim();
-  return head.length > 48 ? head.slice(0, 47) + "…" : head;
 }
 
 const d: Record<string, React.CSSProperties> = {
@@ -639,9 +625,12 @@ const d: Record<string, React.CSSProperties> = {
     color: "var(--text-tertiary)",
     marginBottom: 8,
   },
+  // The reason wraps instead of being ellipsed: a readable sentence beats a
+  // truncated one. Row aligns to the top so a two-line reason keeps the dot and
+  // the venue label on the first line.
   unavailRow: {
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 8,
     opacity: 0.7,
   },
@@ -650,21 +639,24 @@ const d: Record<string, React.CSSProperties> = {
     height: 7,
     borderRadius: "50%",
     flex: "none",
+    marginTop: 5,
     filter: "grayscale(0.4)",
   },
   unavailLabel: {
     fontSize: 12,
     fontWeight: 600,
+    lineHeight: 1.35,
     color: "var(--text-secondary)",
     flex: "none",
   },
   unavailReason: {
     fontSize: 11,
+    lineHeight: 1.35,
     color: "var(--text-tertiary)",
-    marginLeft: "auto",
+    flex: "1 1 auto",
+    minWidth: 0,
     textAlign: "right",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
+    whiteSpace: "normal",
+    overflowWrap: "anywhere",
   },
 };
