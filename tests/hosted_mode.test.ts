@@ -91,6 +91,74 @@ describe("resolveApiBase", () => {
   });
 });
 
+describe("SWAP_API_DISABLED", () => {
+  const HOSTED = "https://x.example";
+
+  test("absent → SWAP_API_URL still wins", () => {
+    expect(resolveApiBase({ env: { SWAP_API_URL: HOSTED } })).toBe(HOSTED);
+  });
+
+  test("true → the local engine even with SWAP_API_URL set", () => {
+    expect(
+      resolveApiBase({
+        env: { SWAP_API_URL: HOSTED, SWAP_API_DISABLED: "true" },
+      }),
+    ).toBeNull();
+  });
+
+  for (const v of ["1", "true", "TRUE", "  True  ", "yes", "YES", "on", "On"]) {
+    test(`${JSON.stringify(v)} disables hosted mode`, () => {
+      expect(
+        resolveApiBase({ env: { SWAP_API_URL: HOSTED, SWAP_API_DISABLED: v } }),
+      ).toBeNull();
+    });
+  }
+
+  for (const v of ["0", "false", "FALSE", " False ", "no", "NO", "off", "Off", "", "   "]) {
+    test(`${JSON.stringify(v)} leaves hosted mode on`, () => {
+      expect(
+        resolveApiBase({ env: { SWAP_API_URL: HOSTED, SWAP_API_DISABLED: v } }),
+      ).toBe(HOSTED);
+    });
+  }
+
+  test("an unrecognised value fails loud — no silent coercion", () => {
+    expect(() =>
+      resolveApiBase({ env: { SWAP_API_URL: HOSTED, SWAP_API_DISABLED: "maybe" } }),
+    ).toThrow('SWAP_API_DISABLED must be true or false (got "maybe")');
+  });
+
+  test("--hosted wins over SWAP_API_DISABLED=true", () => {
+    expect(
+      resolveApiBase({
+        hosted: true,
+        env: { SWAP_API_URL: HOSTED, SWAP_API_DISABLED: "true" },
+      }),
+    ).toBe(HOSTED_DEFAULT);
+  });
+
+  test("--local with SWAP_API_DISABLED=false still forces local", () => {
+    expect(
+      resolveApiBase({
+        local: true,
+        env: { SWAP_API_URL: HOSTED, SWAP_API_DISABLED: "false" },
+      }),
+    ).toBeNull();
+  });
+
+  test("disabled with no SWAP_API_URL is still just local", () => {
+    expect(resolveApiBase({ env: { SWAP_API_DISABLED: "1" } })).toBeNull();
+  });
+
+  test("an invalid URL is never reached once hosted mode is disabled", () => {
+    expect(
+      resolveApiBase({
+        env: { SWAP_API_URL: "swap.9summits.io", SWAP_API_DISABLED: "true" },
+      }),
+    ).toBeNull();
+  });
+});
+
 describe("remoteSubmitUrl", () => {
   test("a server-rewritten relative url resolves against the base", () => {
     expect(

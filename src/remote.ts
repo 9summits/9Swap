@@ -57,13 +57,38 @@ const MAX_INTERMEDIARY_LOOKUPS = 12;
 
 // ───────────────────────────── base resolution ──────────────────────────────
 
+const TRUTHY = new Set(["1", "true", "yes", "on"]);
+const FALSY = new Set(["0", "false", "no", "off", ""]);
+
+/**
+ * `SWAP_API_DISABLED` — an explicit opt-out from hosted mode.
+ *
+ * Clearing `SWAP_API_URL` to escape a value baked into the public binary is
+ * awkward (it lives in `.env.install`, not in the shell), so a boolean says
+ * "use the local engine with my own keys" without having to find and unset
+ * the URL. Parsed strictly: an unrecognised value is a hard error rather than
+ * a silent `false`, because silently staying hosted is exactly what the user
+ * was trying to avoid.
+ */
+function apiDisabled(env: Record<string, string | undefined>): boolean {
+  const raw = env.SWAP_API_DISABLED;
+  if (raw === undefined) return false;
+  const v = raw.trim().toLowerCase();
+  if (TRUTHY.has(v)) return true;
+  if (FALSY.has(v)) return false;
+  throw new Error(
+    `SWAP_API_DISABLED must be true or false (got ${JSON.stringify(raw)})`,
+  );
+}
+
 /**
  * Resolve the hosted API base for this run, or `null` for the local engine.
  *
- * Precedence: `--local` → `--hosted` → `SWAP_API_URL` → local. `SWAP_API_URL`
- * is read from `process.env` *after* `loadDotenv()`, so a value baked into a
- * public build (`.env.install` → `EMBEDDED_ENV`) turns hosted mode on by
- * default for that binary while a shell export still overrides it.
+ * Precedence: `--local` → `--hosted` → `SWAP_API_DISABLED=true` →
+ * `SWAP_API_URL` → local. The CLI flags always beat the environment. Both env
+ * vars are read from `process.env` *after* `loadDotenv()`, so a value baked
+ * into a public build (`.env.install` → `EMBEDDED_ENV`) turns hosted mode on
+ * by default for that binary while a shell export still overrides it.
  */
 export function resolveApiBase(
   opts: {
@@ -77,7 +102,9 @@ export function resolveApiBase(
   }
   if (opts.local) return null;
   if (opts.hosted) return HOSTED_DEFAULT;
-  const raw = (opts.env ?? process.env).SWAP_API_URL?.trim();
+  const env = opts.env ?? process.env;
+  if (apiDisabled(env)) return null;
+  const raw = env.SWAP_API_URL?.trim();
   if (!raw) return null;
   return normalizeBase(raw);
 }

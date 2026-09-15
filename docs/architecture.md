@@ -55,7 +55,7 @@ src/
   browser.ts        --browser impl: Bun.serve() local UI bridge; /tx, /assemble, /simulate, /submit, /done
   browser.embedded.ts  text-imports web/dist/index.html (vite singlefile) at build time
   core.ts           commander-free composition layer over the primitives (shared by the server handlers)
-  remote.ts         hosted mode (`--hosted` / `--local` / `SWAP_API_URL`): `/api/*` client that replaces the local venue engine for quote + build, and the wire → NormalizedQuote mapping
+  remote.ts         hosted mode (`--hosted` / `--local` / `SWAP_API_URL` / `SWAP_API_DISABLED`): `/api/*` client that replaces the local venue engine for quote + build, and the wire → NormalizedQuote mapping
   server/
     handlers.ts     STATELESS request handlers for every dApp endpoint (Web Fetch API only, no Bun.*)
     shared.ts       Bun-free helpers extracted out of browser.ts (Payload types, rewriteAuthedOrderSubmit, proxyOrderSubmit)
@@ -102,10 +102,19 @@ are in [venues.md](./venues.md#venue-adapter-contract).
 `src/remote.ts` is the `--hosted` / `--local` client: when it resolves a
 non-null API base, `-a swap` runs against that deployment's `/api/*` instead
 of the local venue engine. `resolveApiBase()` precedence: `--local` beats
-`--hosted` (`HOSTED_DEFAULT = https://swap.9summits.io`) beats the
-`SWAP_API_URL` env var (read after `loadDotenv()`, so a value baked into
-`.env.install` wins for the public binary unless a shell export overrides
-it) beats the local engine.
+`--hosted` (`HOSTED_DEFAULT = https://swap.9summits.io`) beats
+`SWAP_API_DISABLED=true` beats the `SWAP_API_URL` env var (both read after
+`loadDotenv()`, so a value baked into `.env.install` wins for the public
+binary unless a shell export overrides it) beats the local engine.
+
+`SWAP_API_DISABLED` (default `false`) is the explicit opt-out: unsetting an
+embedded `SWAP_API_URL` is awkward, so `SWAP_API_DISABLED=true` forces the
+local engine and its own keys without touching the URL. It accepts
+`1`/`true`/`yes`/`on` and `0`/`false`/`no`/`off` (case-insensitive, trimmed);
+any other value throws `SWAP_API_DISABLED must be true or false (got "…")`
+rather than degrading to `false`, since a silent `false` would leave the run
+hosted — the exact outcome the user was opting out of. The CLI flags always
+win over both variables.
 
 What moves to the API in hosted mode: `remoteResolveToken` /
 `remoteResolveAddresses` replace `resolveToken` / `resolveAddresses`

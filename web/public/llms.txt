@@ -28,7 +28,7 @@ There is no separate marketing site, blog, or public pricing page. The SPA at `/
 - [One-shot installer](https://swap.9summits.io/install.sh): Downloads a prebuilt `swap` binary for macOS/Linux into `~/.local/bin` (override with `SWAP_INSTALL_DIR`)
 - CLI self-update: `swap update` replaces the installed binary with the latest public prebuilt (same Vercel Blob assets as the installer; `SWAP_INSTALL_BASE` / `SWAP_INSTALL_DIR`)
 - [CLI binaries CDN](https://swap.9summits.io/cli/): Redirects to public Vercel Blob assets (`swap-<os>-<arch>`); used by the installer and `swap update`
-- **Hosted by default**: the installed binary quotes and builds through this host's `/api/*` (`SWAP_API_URL=https://swap.9summits.io`, same as `--hosted`), so every venue works with zero key configuration. `--local` (or clearing `SWAP_API_URL`) switches to the local engine with the user's own venue keys and RPC. `GET /api/mode.apiVersion` must match the CLI's expectation (currently `1`) or it refuses to run and tells the user to run `swap update`
+- **Hosted by default**: the installed binary quotes and builds through this host's `/api/*` (`SWAP_API_URL=https://swap.9summits.io`, same as `--hosted`), so every venue works with zero key configuration. `--local` (or `SWAP_API_DISABLED=true`, which wins over `SWAP_API_URL` without clearing it) switches to the local engine with the user's own venue keys and RPC. `GET /api/mode.apiVersion` must match the CLI's expectation (currently `1`) or it refuses to run and tells the user to run `swap update`
 
 ## API (stateless JSON)
 

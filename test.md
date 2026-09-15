@@ -23,12 +23,14 @@ bun run typecheck      # tsc --noEmit on the whole project
 ```bash
 bun run test                     # all unit tests (tests/*.test.ts)
 bun test tests/hops_approx.test.ts   # a single file
-bun test tests/hosted_mode.test.ts   # hosted mode (--hosted / --local / SWAP_API_URL) offline unit tests
+bun test tests/hosted_mode.test.ts   # hosted mode (--hosted / --local / SWAP_API_URL / SWAP_API_DISABLED) offline unit tests
 ```
 
 `tests/hosted_mode.test.ts` stubs `fetch` and covers `src/remote.ts` end to
 end without a network call: `resolveApiBase` precedence
-(`--local` > `--hosted` > `SWAP_API_URL` > local engine), the wire to
+(`--local` > `--hosted` > `SWAP_API_DISABLED=true` > `SWAP_API_URL` >
+local engine, including the strict boolean parsing of `SWAP_API_DISABLED`),
+the wire to
 `NormalizedQuote` mapping (`routeQuoteToNormalized`), the NDJSON stream
 reader (`venueResultsFromNdjson`, including a line split across chunk
 boundaries), the `apiVersion` mismatch check, and the 429 / unreachable-API

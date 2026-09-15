@@ -22,7 +22,7 @@ swap --init                                               # prompt for ALCHEMY_A
 
 Installer env: `SWAP_INSTALL_DIR` (default `~/.local/bin`), `SWAP_INSTALL_BASE` (asset base), `SWAP_NO_PROGRESS=1`.
 
-The public prebuilt binary is **hosted by default**: it quotes and builds through `https://swap.9summits.io/api/*` (`--hosted`), so every venue works with zero key configuration. Building a tx, `--browser` and `max` still need a sender address but no RPC in hosted mode; only `--simulate` and the local-only actions still call your own RPC. Pass `--local` (or clear `SWAP_API_URL`) to switch to the local engine and your own venue keys (see 09). The first-run RPC prompt only fires on an interactive terminal and only when the run actually needs an RPC; in scripts and agents nothing ever blocks on stdin.
+The public prebuilt binary is **hosted by default**: it quotes and builds through `https://swap.9summits.io/api/*` (`--hosted`), so every venue works with zero key configuration. Building a tx, `--browser` and `max` still need a sender address but no RPC in hosted mode; only `--simulate` and the local-only actions still call your own RPC. Pass `--local` (or set `SWAP_API_DISABLED=true`) to switch to the local engine and your own venue keys (see 09). The first-run RPC prompt only fires on an interactive terminal and only when the run actually needs an RPC; in scripts and agents nothing ever blocks on stdin.
 
 ## 02 · Usage & flags
 
@@ -230,7 +230,12 @@ Config precedence: shell env → `.env` in the current directory → `~/.swap/co
 
 By default the public binary quotes and builds through `https://swap.9summits.io/api/*` instead of the local venue engine: no venue key and no RPC needed for a plain quote or a `-d` build, and every key-gated venue (1inch, Fusion, Matcha/0x, Uniswap, UniswapX) works out of the box. `--simulate` and the local-only actions (`send`, `unwrapwrseth`, `withdrawsparkweth`, `unstakesavax`, `claimsavax`) still run against your own RPC.
 
-Resolution order: `--local` > `--hosted` > `SWAP_API_URL` env var > local engine. The public prebuilt binary embeds `SWAP_API_URL=https://swap.9summits.io`. To self-host: pass `--local` for one run, or clear `SWAP_API_URL` (unset it in the shell, `.env`, or `~/.swap/config`) and configure your own venue keys and RPC.
+Resolution order: `--local` > `--hosted` > `SWAP_API_DISABLED=true` > `SWAP_API_URL` env var > local engine. The public prebuilt binary embeds `SWAP_API_URL=https://swap.9summits.io`. To self-host: pass `--local` for one run, set `SWAP_API_DISABLED=true`, or clear `SWAP_API_URL` (unset it in the shell, `.env`, or `~/.swap/config`), and configure your own venue keys and RPC.
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `SWAP_API_URL` | `https://swap.9summits.io` (embedded in the public binary) | Base URL of the `/api/*` deployment the CLI quotes and builds through. Empty/unset disables hosted mode |
+| `SWAP_API_DISABLED` | `false` | `true` forces the local engine with your own keys and RPC even when `SWAP_API_URL` is set, so the embedded URL can be opted out of without clearing it. Accepts `1`/`true`/`yes`/`on` and `0`/`false`/`no`/`off`; any other value is an error |
 
 Hosted specifics: `--nofee` is refused (fee policy is server-side); the offered venue list comes from `GET /api/mode` and omits `curve`; a `hosted  quotes and tx build via <base>` line marks every run on stderr; a rate-limited request (429) reports the retry delay; an unreachable API fails loud and suggests `--local` rather than falling back silently; a stale binary whose `apiVersion` no longer matches the deployment fails with `hosted API contract mismatch … run swap update`. No telemetry is added by hosted mode (the CLI still never calls `/done`), but the server does see the caller's IP, the pair, the amounts, and the `--from` address on a build, the same as the web dApp.
 

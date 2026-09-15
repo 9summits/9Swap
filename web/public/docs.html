@@ -620,8 +620,8 @@
           <code>https://swap.9summits.io/api/*</code> out of the box
           (<code>--hosted</code>), so every venue works with zero key
           configuration and no RPC, except <code>--simulate</code>. Pass
-          <code>--local</code> (or clear <code>SWAP_API_URL</code>) to switch to
-          the local engine and your own venue keys and RPC. See
+          <code>--local</code> (or set <code>SWAP_API_DISABLED=true</code>) to
+          switch to the local engine and your own venue keys and RPC. See
           <a href="#config">09</a>.
         </p>
       </div>
@@ -1350,12 +1350,37 @@
       </p>
       <p>
         Resolution order: <code>--local</code> &gt; <code>--hosted</code> &gt;
-        <code>SWAP_API_URL</code> env var &gt; local engine. The public
-        prebuilt binary embeds <code>SWAP_API_URL=https://swap.9summits.io</code>.
-        To self-host, pass <code>--local</code> for one run, or clear
+        <code>SWAP_API_DISABLED=true</code> &gt; <code>SWAP_API_URL</code> env
+        var &gt; local engine. The public prebuilt binary embeds
+        <code>SWAP_API_URL=https://swap.9summits.io</code>. To self-host, pass
+        <code>--local</code> for one run, set
+        <code>SWAP_API_DISABLED=true</code>, or clear
         <code>SWAP_API_URL</code> (unset it in the shell, <code>.env</code>, or
-        <code>~/.swap/config</code>) and configure your own venue keys and RPC.
+        <code>~/.swap/config</code>), and configure your own venue keys and RPC.
       </p>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Variable</th>
+              <th>Default</th>
+              <th>Effect</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>SWAP_API_URL</code></td>
+              <td><code>https://swap.9summits.io</code> (embedded in the public binary)</td>
+              <td>Base URL of the <code>/api/*</code> deployment the CLI quotes and builds through. Empty/unset disables hosted mode</td>
+            </tr>
+            <tr>
+              <td><code>SWAP_API_DISABLED</code></td>
+              <td><code>false</code></td>
+              <td><code>true</code> forces the local engine with your own keys and RPC even when <code>SWAP_API_URL</code> is set, so the embedded URL can be opted out of without clearing it. Accepts <code>1</code>/<code>true</code>/<code>yes</code>/<code>on</code> and <code>0</code>/<code>false</code>/<code>no</code>/<code>off</code>; any other value is an error</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <p>
         Hosted specifics: <code>--nofee</code> is refused (fee policy is
         server-side); the offered venue list comes from

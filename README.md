@@ -309,14 +309,16 @@ Uniswap, UniswapX) works out of the box. `--simulate` and the local-only
 actions (`send`, `unwrapwrseth`, `withdrawsparkweth`, `unstakesavax`,
 `claimsavax`) still run against your own RPC.
 
-Resolution order: `--local` > `--hosted` > `SWAP_API_URL` > local engine. The
-public prebuilt binary embeds `SWAP_API_URL=https://swap.9summits.io`. To
-self-host with your own venue keys and RPC, pass `--local` for one run, or
-clear `SWAP_API_URL` (unset it in the shell, `.env`, or `~/.swap/config`).
+Resolution order: `--local` > `--hosted` > `SWAP_API_DISABLED=true` >
+`SWAP_API_URL` > local engine. The public prebuilt binary embeds
+`SWAP_API_URL=https://swap.9summits.io`. To self-host with your own venue keys
+and RPC, pass `--local` for one run, set `SWAP_API_DISABLED=true`, or clear
+`SWAP_API_URL` (unset it in the shell, `.env`, or `~/.swap/config`).
 
 | Variable | Default | Effect |
 |----------|---------|--------|
 | `SWAP_API_URL` | `https://swap.9summits.io` (baked into the public binary) | Base URL of a `/api/*` deployment the CLI quotes and builds through. Empty/unset disables hosted mode |
+| `SWAP_API_DISABLED` | `false` | `true` forces the local engine with your own keys and RPC even when `SWAP_API_URL` is set, so an embedded URL can be opted out of without finding and clearing it. Accepts `1`/`true`/`yes`/`on` and `0`/`false`/`no`/`off`; any other value is an error |
 
 In hosted mode `--nofee` is refused (fee policy is server-side), the venue
 list comes from `GET /api/mode` (`curve` is not offered there), and a stale
