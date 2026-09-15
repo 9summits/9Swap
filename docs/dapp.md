@@ -47,12 +47,17 @@ order. Every handler reconstructs its inputs from the request body. `quoteId` in
 responses is a client-side round key only; nothing consumes it server-side.
 Endpoints are sid-gated locally and gateless on the serverless target.
 
-- `GET /api/mode` → `{ interactive, sid, chains, venues, buyVenues, defaultChain,
-  walletConnectProjectId }`. The page calls this first; an interactive response
-  renders the dApp, otherwise it falls back to the legacy `--browser` sign-only
-  page (one bundle, two modes). `venues` excludes anything in
-  `SWAP_DISABLE_VENUES`; `buyVenues` is `BUY_CAPABLE_VENUES` for exact-out UI
-  filtering.
+- `GET /api/mode` → `{ interactive, apiVersion, sid, chains, venues, buyVenues,
+  defaultChain, walletConnectProjectId }`. The page calls this first; an
+  interactive response renders the dApp, otherwise it falls back to the legacy
+  `--browser` sign-only page (one bundle, two modes). `venues` excludes anything
+  in `SWAP_DISABLE_VENUES`; `buyVenues` is `BUY_CAPABLE_VENUES` for exact-out UI
+  filtering. `apiVersion` (`API_VERSION` in `src/server/shared.ts`, currently
+  `1`) is the version of this wire contract: non-browser clients — the CLI's
+  hosted mode — read it to tell a current deployment from one predating a field
+  they need. A deployment older than the constant omits the key entirely, which
+  reads as "pre-versioning". Bump it only when the contract gains or breaks a
+  field; the dApp ignores it (it ships with the server that serves it).
 - `GET /api/tokens?chain=` → curated per-chain list (KyberSwap ks-setting
   whitelist, paginated to ~300, native prepended, 10-min cache). Each
   `logoURI` is rewritten to `GET /api/icon?chain=&address=` so the browser
@@ -70,6 +75,30 @@ Endpoints are sid-gated locally and gateless on the serverless target.
   slippageBps, allowAsync, venues?}` — the `-v all` engine (no wallet needed;
   routes ranked best-first by side; USD/price-impact derived from venue-provided
   `amountInUsd`/`amountOutUsd`).
+
+  Both handlers emit the **same row shape** through one mapper,
+  `routeQuoteWire()` in `src/server/handlers.ts` — `/api/quote` in `routes[]`
+  (ranked), the stream in each `{type:"route", route}` event (settle order).
+  Per row: `venue`, `amountIn`, `amountOut`, `minAmountOut?`, `gasUsd`,
+  `priceImpactPct`, `kind`, `gasUnits`, `gasPriceWei`, `amountInUsd`,
+  `amountOutUsd`, `buyRefine?`, plus four fields the terminal renderers need:
+
+  - `hops` — the venue's `NormalizedHop[]` verbatim, token **addresses** (the
+    native sentinel for the chain coin, or an opaque positional label from
+    venues that expose no intermediate address). Not to be confused with
+    `/api/route`'s `hops`, which are symbol-labelled for the route graph.
+  - `router` — `string | null`, the venue's router/settlement contract.
+  - `protocolFee` — `{raw, sharePct, side:"in"|"out"} | null`.
+  - `tokenHints` — `NormalizedQuote.tokenHints` (a `Map`) serialized as a plain
+    object keyed by lowercase address; `{}` when the venue ships none.
+
+  `hops` / `router` / `protocolFee` / `tokenHints` / `amountInUsd` /
+  `amountOutUsd` are **always present** (possibly `null` / `[]` / `{}`), so a
+  client can round-trip a row back into a `NormalizedQuote` without a second
+  call — that is what `src/format.ts` and `src/json.ts` consume in hosted mode.
+  `raw` (the venue's untouched API response) is never serialized: unbounded,
+  venue-specific, and a plausible bigint carrier. The dApp ignores the four
+  additions; they were purely additive.
 - `POST /api/route` `{chain, venue, amountIn|amountOut, slippageBps?, tokenIn:
   {address,symbol,decimals}, tokenOut: {…}}` → symbol-labelled hops for the route
   graph. Stateless: re-quotes the single venue fresh. Validates the venue against

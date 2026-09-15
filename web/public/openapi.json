@@ -268,9 +268,10 @@
       },
       "Mode": {
         "type": "object",
-        "required": ["interactive", "chains", "venues", "defaultChain"],
+        "required": ["interactive", "apiVersion", "chains", "venues", "defaultChain"],
         "properties": {
           "interactive": { "type": "boolean", "const": true },
+          "apiVersion": { "type": "integer", "description": "Version of the /api/* wire contract served by this deployment. Absent on deployments predating versioning (treat as 0). Non-browser clients gate on it before relying on newer RouteQuote fields.", "examples": [1] },
           "sid": { "type": "string", "description": "Session id on the local server; empty on the public host" },
           "chains": { "type": "array", "items": { "$ref": "#/components/schemas/ChainMeta" } },
           "venues": { "type": "array", "items": { "$ref": "#/components/schemas/VenueMeta" } },
@@ -320,9 +321,44 @@
           { "chain": "eth", "tokenInAddress": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "tokenOutAddress": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "amountIn": "1000000000", "slippageBps": 10, "allowAsync": false }
         ]
       },
+      "RouteHopRaw": {
+        "type": "object",
+        "description": "One hop of a venue's route, token ADDRESSES rather than symbols — the shape a venue adapter normalises to. Distinct from RouteHop (POST /api/route), which is the symbol-labelled form used by the dApp's route graph.",
+        "required": ["tokenIn", "tokenOut", "exchange", "swapAmount"],
+        "properties": {
+          "tokenIn": { "type": "string", "description": "Hop input token address (lowercase; the native sentinel 0xeee…eee for the chain coin). Some venues expose no intermediate addresses and emit an opaque positional label instead." },
+          "tokenOut": { "type": "string", "description": "Hop output token address, same conventions as tokenIn" },
+          "exchange": { "type": "string", "description": "Protocol / pool label" },
+          "swapAmount": { "type": "string", "description": "Amount routed through the hop, in tokenIn base units — unless approxAmount is true" },
+          "approxAmount": { "type": "boolean", "description": "True when swapAmount is only a relative split weight denominated in the ROUTE input token, not a real amount in this hop's tokenIn (openocean, 1inch). Ratio math stays valid; never display it as an absolute amount." },
+          "amountOut": { "type": "string", "description": "Hop output in tokenOut base units — only when the venue reports it" },
+          "pool": { "type": "string" },
+          "fee": { "type": "integer", "description": "Fee in hundredths of a bp (3000 = 0.3 %)" }
+        }
+      },
+      "TokenHint": {
+        "type": "object",
+        "description": "Venue-supplied metadata for an address appearing in hops[], so a client can label the route without a second lookup.",
+        "required": ["symbol", "name", "decimals"],
+        "properties": {
+          "symbol": { "type": "string" },
+          "name": { "type": "string" },
+          "decimals": { "type": "integer", "minimum": 0, "maximum": 255 }
+        }
+      },
+      "ProtocolFee": {
+        "type": "object",
+        "description": "Explicit fee surfaced by the venue's API — distinct from the implicit spread aggregators bake into the price. CoW always returns one; sync aggregators only when an integrator/partner is configured.",
+        "required": ["raw", "sharePct", "side"],
+        "properties": {
+          "raw": { "$ref": "#/components/schemas/BaseUnits" },
+          "sharePct": { "type": "number", "description": "fee / corresponding amount × 100" },
+          "side": { "type": "string", "enum": ["in", "out"], "description": "Token the fee is denominated in: \"in\" = deducted from tokenIn (CoW), \"out\" = from tokenOut (kyber/odos/velora)" }
+        }
+      },
       "RouteQuote": {
         "type": "object",
-        "required": ["venue", "amountIn", "amountOut", "kind"],
+        "required": ["venue", "amountIn", "amountOut", "kind", "hops", "router", "protocolFee", "tokenHints", "amountInUsd", "amountOutUsd"],
         "properties": {
           "venue": { "$ref": "#/components/schemas/Venue" },
           "amountIn": { "$ref": "#/components/schemas/BaseUnits" },
@@ -338,8 +374,12 @@
           "gasPriceWei": { "type": ["string", "null"] },
           "amountInUsd": { "type": ["number", "null"] },
           "amountOutUsd": { "type": ["number", "null"] },
+          "hops": { "type": "array", "items": { "$ref": "#/components/schemas/RouteHopRaw" }, "description": "Address-labelled route edges; empty array when the venue exposes no path breakdown" },
+          "router": { "type": ["string", "null"], "description": "Router / settlement contract the venue would execute through, when it reports one" },
+          "protocolFee": { "oneOf": [{ "$ref": "#/components/schemas/ProtocolFee" }, { "type": "null" }] },
+          "tokenHints": { "type": "object", "description": "Address (lowercase) → venue-supplied token metadata for the addresses appearing in hops[]. Empty object when the venue ships none.", "additionalProperties": { "$ref": "#/components/schemas/TokenHint" } },
           "buyRefine": { "type": "boolean", "description": "Exact-out served by a sell-only venue via refine (build is exact-in with a min-out floor at the target)" },
-          "clientSide": { "type": "boolean" }
+          "clientSide": { "type": "boolean", "description": "Client-only: set by the in-browser curve integration on routes it produced. The server never emits it." }
         }
       },
       "QuoteResponse": {
@@ -365,7 +405,7 @@
       "QuoteStreamEvent": {
         "oneOf": [
           { "type": "object", "required": ["type", "quoteId", "side", "chain", "tokenIn", "tokenOut", "expiresAt"], "properties": { "type": { "const": "meta" }, "quoteId": { "type": "string" }, "side": { "$ref": "#/components/schemas/TradeSide" }, "chain": { "type": "object" }, "tokenIn": { "$ref": "#/components/schemas/WireToken" }, "tokenOut": { "$ref": "#/components/schemas/WireToken" }, "amountIn": { "type": "string" }, "amountOut": { "type": "string" }, "expiresAt": { "type": "integer" } } },
-          { "type": "object", "required": ["type", "route"], "properties": { "type": { "const": "route" }, "route": { "$ref": "#/components/schemas/RouteQuote" } } },
+          { "type": "object", "required": ["type", "route"], "description": "One settled venue. The row is byte-for-byte the same RouteQuote shape POST /api/quote returns in routes[] — both handlers share one mapper — except that stream rows arrive unranked, in settle order.", "properties": { "type": { "const": "route" }, "route": { "$ref": "#/components/schemas/RouteQuote" } } },
           { "type": "object", "required": ["type", "venue", "error"], "properties": { "type": { "const": "verror" }, "venue": { "type": "string" }, "error": { "type": "string" } } },
           { "type": "object", "required": ["type", "expiresAt"], "properties": { "type": { "const": "done" }, "expiresAt": { "type": "integer" } } },
           { "type": "object", "required": ["type", "error"], "properties": { "type": { "const": "fatal" }, "error": { "type": "string" } } }

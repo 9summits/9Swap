@@ -14,6 +14,15 @@ import type {
   NormalizedTx,
 } from "../venues/index.ts";
 
+// Version of the `/api/*` wire contract, advertised by GET /api/mode as
+// `apiVersion`. Non-browser clients (the CLI's hosted mode) read it to decide
+// whether a deployment is new enough to serve the fields they need — a page
+// served from an older deployment omits the key entirely, which reads as
+// "pre-versioning" (i.e. no hops / router / tokenHints on route rows).
+// Bump ONLY on a breaking or field-adding change to the contract; additive
+// changes that every consumer already tolerates don't need one.
+export const API_VERSION = 1;
+
 // Shape served by GET /tx?id=… — must match `web/src/payload.ts`.
 export type ApprovalForBrowser = {
   needed: boolean;

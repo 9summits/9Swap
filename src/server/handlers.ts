@@ -37,8 +37,10 @@ import {
   UnsupportedSideError,
   type Venue,
   type NormalizedQuote,
+  type NormalizedHop,
   type NormalizedOrder,
   type BuildResult,
+  type TokenHint,
 } from "../venues/index.ts";
 import {
   resolveTokenPair,
@@ -56,6 +58,7 @@ import {
   listVenues,
 } from "../core.ts";
 import {
+  API_VERSION,
   withFromFallback,
   rewriteAuthedOrderSubmit,
   proxyOrderSubmit,
@@ -253,6 +256,89 @@ function sanitize<T>(value: T): unknown {
   );
 }
 
+// ───────────────────── NormalizedQuote → wire RouteQuote ─────────────────
+//
+// Single source of truth for the `routes[]` rows of POST /api/quote AND the
+// `type:"route"` events of POST /api/quote/stream. The two used to build the
+// object inline and had already drifted (the non-stream one dropped
+// amountInUsd / amountOutUsd).
+//
+// The extra fields beyond what the dApp table reads (hops, router,
+// protocolFee, tokenHints) exist for non-browser consumers — the CLI's hosted
+// mode rebuilds a NormalizedQuote from this row and feeds it to src/format.ts
+// / src/json.ts, which need exactly these. Purely additive for the dApp.
+//
+// `raw` is deliberately NEVER serialized: it is the venue's untouched API
+// response (unbounded, venue-specific, and a plausible carrier of bigints).
+
+export type RouteQuoteWire = {
+  venue: Venue;
+  amountIn: string;
+  amountOut: string;
+  minAmountOut?: string;
+  gasUsd: number | null;
+  priceImpactPct: number | null;
+  kind: "sync" | "async";
+  gasUnits: number | null;
+  gasPriceWei: string | null;
+  amountInUsd: number | null;
+  amountOutUsd: number | null;
+  /** Raw hop edges, token ADDRESSES (not symbols — see /api/route for those). */
+  hops: NormalizedHop[];
+  router: string | null;
+  protocolFee: { raw: string; sharePct: number; side: "in" | "out" } | null;
+  /** NormalizedQuote.tokenHints as a plain object, keys lowercased. */
+  tokenHints: Record<string, TokenHint>;
+  buyRefine?: true;
+};
+
+function priceImpactPctOf(q: NormalizedQuote): number | null {
+  if (q.amountInUsd == null || q.amountOutUsd == null || q.amountInUsd <= 0) {
+    return null;
+  }
+  return ((q.amountOutUsd - q.amountInUsd) / q.amountInUsd) * 100;
+}
+
+// Map → object. Keys are lowercased here too: adapters already lowercase by
+// convention, but the wire contract states it, so make it true by construction.
+function tokenHintsToWire(
+  hints: Map<string, TokenHint>,
+): Record<string, TokenHint> {
+  const out: Record<string, TokenHint> = {};
+  for (const [addr, hint] of hints) {
+    out[addr.toLowerCase()] = {
+      symbol: hint.symbol,
+      name: hint.name,
+      decimals: hint.decimals,
+    };
+  }
+  return out;
+}
+
+export function routeQuoteWire(
+  venue: Venue,
+  quote: NormalizedQuote,
+): RouteQuoteWire {
+  return {
+    venue,
+    amountIn: quote.amountIn,
+    amountOut: quote.amountOut,
+    ...(quote.minAmountOut ? { minAmountOut: quote.minAmountOut } : {}),
+    gasUsd: quote.gasUsd,
+    priceImpactPct: priceImpactPctOf(quote),
+    kind: (isAsyncVenue(venue) ? "async" : "sync") as "sync" | "async",
+    gasUnits: quote.gasUnits,
+    gasPriceWei: quote.gasPriceWei,
+    amountInUsd: quote.amountInUsd,
+    amountOutUsd: quote.amountOutUsd,
+    hops: quote.hops,
+    router: quote.router,
+    protocolFee: quote.protocolFee ?? null,
+    tokenHints: tokenHintsToWire(quote.tokenHints),
+    ...(quote.buyRefine ? { buyRefine: true as const } : {}),
+  };
+}
+
 // ───────────────────────────── handlers ─────────────────────────────────
 
 // GET /api/mode — interactive-mode bootstrap. `sid` is "" on Vercel (no
@@ -264,6 +350,9 @@ export function handleMode(opts?: { sid?: string }): Response {
   const disabled = disabledVenues();
   return jsonRes({
     interactive: true,
+    // Wire-contract version — a non-browser client (CLI hosted mode) reads it
+    // to tell a current deployment from one predating the field it needs.
+    apiVersion: API_VERSION,
     sid: opts?.sid ?? "",
     chains: listChains(),
     venues: listVenues(true),
@@ -520,30 +609,12 @@ export async function handleQuote(req: Request): Promise<Response> {
       results
         .filter((r): r is { venue: Venue; quote: NormalizedQuote } => "quote" in r)
         .map((r) => {
-          const kind = (isAsyncVenue(r.venue) ? "async" : "sync") as
-            | "sync"
-            | "async";
+          const row = routeQuoteWire(r.venue, r.quote);
+          // `execution` is the ranking input only — stripped right after the
+          // sort so it never reaches the wire.
           return {
-            venue: r.venue,
-            amountIn: r.quote.amountIn,
-            amountOut: r.quote.amountOut,
-            ...(r.quote.minAmountOut
-              ? { minAmountOut: r.quote.minAmountOut }
-              : {}),
-            gasUsd: r.quote.gasUsd,
-            priceImpactPct:
-              r.quote.amountInUsd != null &&
-              r.quote.amountOutUsd != null &&
-              r.quote.amountInUsd > 0
-                ? ((r.quote.amountOutUsd - r.quote.amountInUsd) /
-                    r.quote.amountInUsd) *
-                  100
-                : null,
-            kind,
-            gasUnits: r.quote.gasUnits,
-            gasPriceWei: r.quote.gasPriceWei,
-            execution: toExecution(kind, r.quote.gasUnits, r.quote.gasPriceWei),
-            ...(r.quote.buyRefine ? { buyRefine: true as const } : {}),
+            ...row,
+            execution: toExecution(row.kind, row.gasUnits, row.gasPriceWei),
           };
         }),
       side,
@@ -657,30 +728,7 @@ export async function handleQuoteStream(req: Request): Promise<Response> {
           disableOdosRfq,
         })) {
           if ("quote" in r) {
-            send({
-              type: "route",
-              route: {
-                venue: r.venue,
-                amountIn: r.quote.amountIn,
-                amountOut: r.quote.amountOut,
-                ...(r.quote.minAmountOut
-                  ? { minAmountOut: r.quote.minAmountOut }
-                  : {}),
-                gasUsd: r.quote.gasUsd,
-                priceImpactPct:
-                  r.quote.amountInUsd != null && r.quote.amountOutUsd != null && r.quote.amountInUsd > 0
-                    ? ((r.quote.amountOutUsd - r.quote.amountInUsd) / r.quote.amountInUsd) * 100
-                    : null,
-                kind: (isAsyncVenue(r.venue) ? "async" : "sync") as
-                  | "sync"
-                  | "async",
-                gasUnits: r.quote.gasUnits,
-                gasPriceWei: r.quote.gasPriceWei,
-                amountInUsd: r.quote.amountInUsd,
-                amountOutUsd: r.quote.amountOutUsd,
-                ...(r.quote.buyRefine ? { buyRefine: true as const } : {}),
-              },
-            });
+            send({ type: "route", route: routeQuoteWire(r.venue, r.quote) });
           } else {
             send({ type: "verror", venue: r.venue, error: r.error });
           }
