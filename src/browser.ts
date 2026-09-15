@@ -16,6 +16,7 @@ import {
   type Payload,
 } from "./server/shared.ts";
 import { parseDoneReport } from "./server/done_report.ts";
+import { cliClientHeaders, remoteSubmitUrl } from "./remote.ts";
 
 // The Bun-free helpers + wire types live in src/server/shared.ts so the
 // Vercel functions (Node runtime) can import them without dragging in this
@@ -90,6 +91,16 @@ export type BrowserInputs = {
         approveTx: NormalizedTx | null;
       }
     | null;
+  // Hosted mode: base URL of the `/api/*` deployment that produced `tx` /
+  // `order` / `permitTx`. When set, this server stops being an executor and
+  // becomes a same-origin proxy for the two legs the page can't call itself —
+  // `/assemble` and `/submit` — because the page is served from 127.0.0.1 and
+  // the hosted API sends no CORS headers. No local key or RPC is involved:
+  // hosted builds never produce a local `assemble` callback.
+  remoteBase?: string;
+  // Opaque context the hosted build handed back for the stateless permit-tx
+  // leg; echoed to the page so it can send it back on /assemble.
+  assembleContext?: unknown;
 };
 
 export type BrowserOptions = {
@@ -203,6 +214,18 @@ export function startBrowserSession(
         if (url.searchParams.get("id") !== sid) {
           return new Response("forbidden", { status: 403 });
         }
+        if (inputs.remoteBase && inputs.order) {
+          // Hosted: the relayer key lives on the deployment, not here. Forward
+          // the signed body and the server-minted query (venue / chainId /
+          // orderHash) to the hosted /submit; drop our local session id.
+          const target = new URL(
+            remoteSubmitUrl(inputs.remoteBase, inputs.order),
+          );
+          for (const [k, v] of url.searchParams) {
+            if (k !== "id") target.searchParams.set(k, v);
+          }
+          return proxyToRemote(target, req);
+        }
         if (!inputs.order?.submit.auth) {
           return Response.json(
             { error: "/submit called but this order's relayer needs no proxying — POST submit.url directly" },
@@ -215,6 +238,13 @@ export function startBrowserSession(
       if (url.pathname === "/assemble" && req.method === "POST") {
         if (url.searchParams.get("id") !== sid) {
           return new Response("forbidden", { status: 403 });
+        }
+        if (inputs.remoteBase) {
+          // Hosted: the venue API key lives on the deployment. Forward
+          // {signature, context} verbatim — the page already echoes back the
+          // assembleContext the hosted build gave it.
+          const target = new URL(joinBase(inputs.remoteBase, "/assemble"));
+          return proxyToRemote(target, req);
         }
         if (!inputs.assemble) {
           return Response.json(
@@ -313,6 +343,69 @@ export async function serveAndOpen(
   return { outcome, url: session.url };
 }
 
+// Join a hosted base (possibly path-prefixed) with an absolute-rooted path.
+function joinBase(base: string, path: string): string {
+  return `${base.replace(/\/+$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+// Same-origin proxy for the two hosted legs the page cannot call directly
+// (the API sends no CORS headers). Only the body and the server-minted query
+// travel; no local header, cookie, or key is attached.
+async function proxyToRemote(target: URL, req: Request): Promise<Response> {
+  const body = await req.text();
+  try {
+    const upstream = await fetch(target, {
+      method: "POST",
+      headers: {
+        ...cliClientHeaders(),
+        accept: "application/json",
+        "content-type":
+          req.headers.get("content-type") ?? "application/json",
+      },
+      body,
+      redirect: "manual",
+    });
+    const text = await upstream.text();
+    if (!upstream.ok) {
+      console.error(
+        `hosted proxy: ${target.pathname} → ${upstream.status} ${upstream.statusText}: ${text.slice(0, 300)}`,
+      );
+    }
+    return new Response(text, {
+      status: upstream.status,
+      headers: {
+        "content-type":
+          upstream.headers.get("content-type") ?? "application/json",
+      },
+    });
+  } catch (e) {
+    console.error(`hosted proxy: ${target.href} failed: ${(e as Error).message}`);
+    return Response.json(
+      { error: (e as Error).message ?? "hosted proxy failed" },
+      { status: 502 },
+    );
+  }
+}
+
+// Hosted orders come back with the submit URL already rewritten by the
+// deployment to a relative `/submit?venue=…` (auth stripped). Re-attach our
+// local session id so the page's POST still passes this server's sid gate
+// before we forward it upstream.
+function withSessionId(order: NormalizedOrder, sid: string): NormalizedOrder {
+  const url = order.submit.url;
+  if (!url.startsWith("/")) return order;
+  const q = url.indexOf("?");
+  const params = new URLSearchParams(q === -1 ? "" : url.slice(q + 1));
+  params.set("id", sid);
+  return {
+    ...order,
+    submit: {
+      ...order.submit,
+      url: `${q === -1 ? url : url.slice(0, q)}?${params.toString()}`,
+    },
+  };
+}
+
 // Build the JSON payload the page fetches. We strip a couple of bigint
 // instances and pass the approval / tx as the renderer expects.
 function buildPayload(sid: string, i: BrowserInputs): Payload {
@@ -353,8 +446,15 @@ function buildPayload(sid: string, i: BrowserInputs): Payload {
         }
       : null,
     tx: i.tx ? withFromFallback(i.tx, i.sender) : null,
-    order: i.order ? rewriteAuthedOrderSubmit(i.order, sid) : null,
+    order: i.order
+      ? i.remoteBase
+        ? withSessionId(i.order, sid)
+        : rewriteAuthedOrderSubmit(i.order, sid)
+      : null,
     permitTx: i.permitTx,
+    ...(i.assembleContext !== undefined
+      ? { assembleContext: i.assembleContext }
+      : {}),
     walletConnectProjectId: process.env.WALLETCONNECT_PROJECT_ID ?? null,
   };
 }

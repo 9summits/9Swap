@@ -131,13 +131,13 @@ test("openocean: no key → public host with origin+referer, no apikey", async (
   expect(b.headers.referer).toBe("https://app.openocean.finance/");
 });
 
-test("openocean: OPENOCEAN_API_KEY → enterprise host, apikey, no origin", async () => {
+test("openocean: OPENOCEAN_API_KEY → pro host, apikey, no origin", async () => {
   setEnv({ [KEY]: "test-key" });
   expect(availableVenues({ allowAsync: true })).toContain("openocean");
 
   const q = await captureQuote();
   expect(
-    q.url.startsWith("https://open-api-enterprise.openocean.finance/v4/eth/quote?"),
+    q.url.startsWith("https://open-api-pro.openocean.finance/v4/eth/quote?"),
   ).toBe(true);
   expect(q.headers.apikey).toBe("test-key");
   expect(q.headers.origin).toBeUndefined();
@@ -145,7 +145,7 @@ test("openocean: OPENOCEAN_API_KEY → enterprise host, apikey, no origin", asyn
 
   const b = await captureBuild();
   expect(
-    b.url.startsWith("https://open-api-enterprise.openocean.finance/v4/eth/swap?"),
+    b.url.startsWith("https://open-api-pro.openocean.finance/v4/eth/swap?"),
   ).toBe(true);
   expect(b.headers.apikey).toBe("test-key");
   expect(b.headers.origin).toBeUndefined();

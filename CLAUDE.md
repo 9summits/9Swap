@@ -25,6 +25,7 @@ call it.
 src/index.ts         entry point: commander wiring + orchestration
 src/update.ts        `swap update` (pre-commander): fetch the `.sha256` manifest first and skip when the installed binary already matches, else download latest Blob prebuilt, verify, atomic replace
 src/core.ts          commander-free composition layer (shared by the dApp handlers)
+src/remote.ts        hosted mode (`--hosted` / `SWAP_API_URL`): `/api/*` client replacing the local engine for quote + build
 src/chains.ts        chain alias table; src/tokens.ts token resolution; src/amount.ts units
 src/trade_side.ts    sell/buy side, BUY_CAPABLE_VENUES; src/slippage.ts min-out/max-in
 src/format.ts json.ts   terminal + JSON renderers (consume only NormalizedQuote)

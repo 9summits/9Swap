@@ -14,12 +14,16 @@ import { getReferralConfig } from "../referral.ts";
 // OpenOcean Swap API v4. Two deployments share the same surface:
 //
 //   public:     https://open-api.openocean.finance/v4/{chain}/...  (2 rps)
-//   enterprise: https://open-api-enterprise.openocean.finance/v4/{chain}/...
+//   pro:        https://open-api-pro.openocean.finance/v4/{chain}/...  (OPENOCEAN_API_KEY)
+//
+// The former key-gated host, open-api-enterprise.openocean.finance, returns
+// 404 for every path since at least 2026-09-15; the docs still call the tier
+// "Enterprise" but the host is open-api-pro.
 //
 // Public is keyless. Cloudflare 403s headerless CLI fetch with a JS
 // challenge; Origin+Referer matching the web app is enough for Bun's
 // fetch to get JSON (measured 2026-09-08). An OPENOCEAN_API_KEY switches
-// to the enterprise host (`apikey` header) and drops those headers.
+// to the pro host (`apikey` header) and drops those headers.
 //
 // Docs: https://docs.openocean.finance/docs/swap-api/api-pricing-and-access
 // (public) and /enterprise.
@@ -226,7 +230,7 @@ function fromOOAddr(addr: string): string {
 }
 
 const OPENOCEAN_PUBLIC_BASE = "https://open-api.openocean.finance";
-const OPENOCEAN_ENTERPRISE_BASE = "https://open-api-enterprise.openocean.finance";
+const OPENOCEAN_PRO_BASE = "https://open-api-pro.openocean.finance";
 // Cloudflare on the public host allowlists the web app origin. Without
 // both headers, bun fetch gets a 403 HTML challenge instead of JSON.
 const OPENOCEAN_PUBLIC_ORIGIN = "https://app.openocean.finance";
@@ -239,7 +243,7 @@ export type OpenoceanConfig = {
 export function openoceanConfig(): OpenoceanConfig {
   const apiKey = process.env.OPENOCEAN_API_KEY?.trim() || null;
   return {
-    base: apiKey ? OPENOCEAN_ENTERPRISE_BASE : OPENOCEAN_PUBLIC_BASE,
+    base: apiKey ? OPENOCEAN_PRO_BASE : OPENOCEAN_PUBLIC_BASE,
     apiKey,
   };
 }

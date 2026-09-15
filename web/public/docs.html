@@ -613,11 +613,26 @@
         base), <code>SWAP_NO_PROGRESS=1</code>.
       </p>
 
+      <div class="callout">
+        <span class="label">Hosted by default</span>
+        <p>
+          The public prebuilt binary quotes and builds through
+          <code>https://swap.9summits.io/api/*</code> out of the box
+          (<code>--hosted</code>), so every venue works with zero key
+          configuration and no RPC, except <code>--simulate</code>. Pass
+          <code>--local</code> (or set <code>SWAP_API_DISABLED=true</code>) to
+          switch to the local engine and your own venue keys and RPC. See
+          <a href="#config">09</a>.
+        </p>
+      </div>
+
       <h3>First run</h3>
       <p>
         Quotes work out of the box. Building a transaction, simulating, or
-        swapping <code>max</code> needs an RPC. The first time one is required,
-        the CLI prompts for an Alchemy key or an RPC URL and saves it under
+        swapping <code>max</code> needs an RPC in local mode (<code>--local</code>
+        or <code>SWAP_API_URL</code> unset); hosted mode needs one only for
+        <code>--simulate</code>. The first time an RPC is required, the CLI
+        prompts for an Alchemy key or an RPC URL and saves it under
         <code>~/.swap/config</code>. You can trigger that prompt any time:
       </p>
 
@@ -771,7 +786,8 @@
               <td><code>--nofee</code></td>
               <td>
                 Zero the partner fee (<code>REFERRAL_FEE_BPS</code>) for this
-                run on every venue.
+                run on every venue. Refused in hosted mode (fee policy is
+                server-side); use <code>--local</code>.
               </td>
             </tr>
             <tr>
@@ -779,6 +795,24 @@
               <td>
                 With <code>--simulate</code>: also list ERC20 transfers landing
                 at <code>REFERRAL_ADDRESS</code>.
+              </td>
+            </tr>
+            <tr>
+              <td><code>--hosted</code></td>
+              <td>
+                Quote and build through the hosted API
+                (<code>https://swap.9summits.io</code>) for this run instead of
+                the local engine. No venue key, no RPC except
+                <code>--simulate</code>. Nothing is signed remotely. Exclusive
+                with <code>--local</code>.
+              </td>
+            </tr>
+            <tr>
+              <td><code>--local</code></td>
+              <td>
+                Force the local engine for this run even when
+                <code>SWAP_API_URL</code> is set, using your own venue keys and
+                RPC.
               </td>
             </tr>
           </tbody>
@@ -880,10 +914,11 @@
 <span class="p">$</span> swap 2 WETH stETH <span class="f">--allow-async --from</span> 0xYou <span class="f">--browser</span>   <span class="c"># sign an intent order</span></code></pre>
 
       <p>
-        Run <code>swap</code> with no arguments to open the full interactive
-        dApp locally instead — the same UI as
-        <a href="/">swap.9summits.io</a>, served from your machine with your own
-        keys.
+        Run <code>swap</code> with no arguments to open the interactive dApp.
+        In hosted mode (the default) this opens
+        <a href="/">swap.9summits.io</a> directly in your browser; pass
+        <code>--local</code> to start the same dApp server on your machine
+        instead, with your own keys.
       </p>
 
       <!-- ============================================================ -->
@@ -1270,7 +1305,7 @@
             </tr>
             <tr>
               <td><code>OPENOCEAN_API_KEY</code></td>
-              <td><code>openocean</code> enterprise host, higher limits (optional; public host is keyless, 2 rps)</td>
+              <td><code>openocean</code> pro host, higher limits (optional; public host is keyless, 2 rps)</td>
               <td><a href="https://docs.openocean.finance/docs/swap-api/enterprise">docs.openocean.finance</a></td>
             </tr>
             <tr>
@@ -1299,6 +1334,67 @@
         every venue that supports it; the fee is already reflected in the quoted
         amounts so venues stay comparable. <code>--nofee</code> zeroes it for one
         run.
+      </p>
+
+      <h3 id="hosted">Hosted mode</h3>
+      <p>
+        By default the public binary quotes and builds through
+        <code>https://swap.9summits.io/api/*</code> instead of the local venue
+        engine: no venue key and no RPC needed for a plain quote or a
+        <code>-d</code> build, and every key-gated venue (1inch, Fusion,
+        Matcha/0x, Uniswap, UniswapX) works out of the box.
+        <code>--simulate</code> and the local-only actions
+        (<code>send</code>, <code>unwrapwrseth</code>,
+        <code>withdrawsparkweth</code>, <code>unstakesavax</code>,
+        <code>claimsavax</code>) still run against your own RPC.
+      </p>
+      <p>
+        Resolution order: <code>--local</code> &gt; <code>--hosted</code> &gt;
+        <code>SWAP_API_DISABLED=true</code> &gt; <code>SWAP_API_URL</code> env
+        var &gt; local engine. The public prebuilt binary embeds
+        <code>SWAP_API_URL=https://swap.9summits.io</code>. To self-host, pass
+        <code>--local</code> for one run, set
+        <code>SWAP_API_DISABLED=true</code>, or clear
+        <code>SWAP_API_URL</code> (unset it in the shell, <code>.env</code>, or
+        <code>~/.swap/config</code>), and configure your own venue keys and RPC.
+      </p>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Variable</th>
+              <th>Default</th>
+              <th>Effect</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>SWAP_API_URL</code></td>
+              <td><code>https://swap.9summits.io</code> (embedded in the public binary)</td>
+              <td>Base URL of the <code>/api/*</code> deployment the CLI quotes and builds through. Empty/unset disables hosted mode</td>
+            </tr>
+            <tr>
+              <td><code>SWAP_API_DISABLED</code></td>
+              <td><code>false</code></td>
+              <td><code>true</code> forces the local engine with your own keys and RPC even when <code>SWAP_API_URL</code> is set, so the embedded URL can be opted out of without clearing it. Accepts <code>1</code>/<code>true</code>/<code>yes</code>/<code>on</code> and <code>0</code>/<code>false</code>/<code>no</code>/<code>off</code>; any other value is an error</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Hosted specifics: <code>--nofee</code> is refused (fee policy is
+        server-side); the offered venue list comes from
+        <code>GET /api/mode</code> and omits <code>curve</code>; a
+        <code>hosted&nbsp;&nbsp;quotes and tx build via &lt;base&gt;</code>
+        line marks every run on stderr; a rate-limited request (429) reports
+        the retry delay; an unreachable API fails loud and suggests
+        <code>--local</code> rather than falling back silently; a stale binary
+        whose <code>apiVersion</code> no longer matches the deployment fails
+        with <code>hosted API contract mismatch … run swap update</code>. No
+        telemetry is added by hosted mode (the CLI still never calls
+        <code>/done</code>), but the server does see the caller's IP, the
+        pair, the amounts, and the <code>--from</code> address on a build,
+        the same as the web dApp.
       </p>
 
       <!-- ============================================================ -->
