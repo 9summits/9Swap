@@ -194,6 +194,10 @@ added to the settings list when (a)+(b) hold).
   Manual and auto refresh purge the route list. Venues then stream in as
   each `route` or `verror` arrives. Client-side curve updates only its own
   row. `done` drops venues that did not settle this round.
+  A venue that errors lands in the pane's "N venues unavailable" list, where
+  `humanVenueReason` (`web/src/dapp/venueReason.ts`) strips the venue prefix off
+  the raw adapter error and maps it to a short readable label (raw text kept as
+  the row's tooltip).
 
 `useQuote` fills that row's `gasUsd` with the same hop heuristic and ETH_USD=2000
 formula as `fillGasUsd`. Gas price comes from `eth_gasPrice` on the CORS public

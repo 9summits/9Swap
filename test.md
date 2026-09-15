@@ -8,7 +8,7 @@ All commands run from the repo root. Bun is required.
 |-----------------|---------------------------------------|----------------------|
 | Typecheck       | `bun run typecheck`                   | no                  |
 | Unit            | `bun run test` (or `bun test tests/*.test.ts`) | no           |
-| Self-checks     | `bun run web/src/dapp/urlState.ts` · `bun run src/venues/ophis.ts` | no |
+| Self-checks     | `bun run web/src/dapp/urlState.ts` · `bun run web/src/dapp/venueReason.ts` · `bun run src/venues/ophis.ts` | no |
 | Hosted smoke    | `SWAP_API_URL=http://127.0.0.1:5152 bun run src/index.ts …`     | no external network (local `vercel-smoke.ts`) |
 | E2E dApp        | `bun run test:e2e`                    | yes (`.env` filled in)  |
 
@@ -59,6 +59,7 @@ runners). Use `bun run test` or a `tests/*.test.ts` glob.
 ```bash
 bun run web/src/dapp/urlState.ts   # deep-link router round-trip → "urlState self-check: OK"
 bun run web/src/dapp/iconCache.ts  # icon key / persistable-URL checks → "iconCache self-check: OK"
+bun run web/src/dapp/venueReason.ts # unavailable-venue reason mapping → "venueReason self-check: OK"
 bun run src/venues/ophis.ts        # canonical appData + eth-flow calldata → "ophis self-check: OK"
 ```
 
