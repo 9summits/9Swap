@@ -16,13 +16,22 @@ import {
   polygon,
   unichain,
 } from "viem/chains";
-import { http, createConfig, useConnections, useDisconnect } from "wagmi";
+import {
+  http,
+  createConfig,
+  createConnector,
+  useConnections,
+  useDisconnect,
+} from "wagmi";
+import { safe } from "wagmi/connectors";
 import {
   connectorsForWallets,
 } from "@rainbow-me/rainbowkit";
+import type { Wallet, WalletDetailsParams } from "@rainbow-me/rainbowkit";
 import {
   injectedWallet,
   rabbyWallet,
+  safeWallet,
   walletConnectWallet,
 } from "@rainbow-me/rainbowkit/wallets";
 import type { ChainMeta } from "./payload";
@@ -102,6 +111,24 @@ export function publicClientFor(
   return createPublicClient({ chain, transport });
 }
 
+// RainbowKit's stock safeWallet() builds the connector with safe()'s defaults,
+// whose `unstable_getInfoTimeout` is 10 ms — too short for the first
+// sdk.safe.getInfo() round trip through the app.safe.global frame on load, so
+// the connector reports "not a Safe App" and the dApp starts disconnected.
+// Everything else is inherited: safe()'s getProvider() self-gates on
+// window.parent !== window, so this entry never surfaces outside a Safe iframe.
+const safeAppWallet = (): Wallet => ({
+  ...safeWallet(),
+  createConnector: (details: WalletDetailsParams) =>
+    createConnector((config) => ({
+      ...safe({
+        allowedDomains: [/^https:\/\/app\.safe\.global$/],
+        unstable_getInfoTimeout: 3000,
+      })(config),
+      ...details,
+    })),
+});
+
 export function buildWagmiConfig(args: {
   chain: ChainMeta;
   walletConnectProjectId: string | null;
@@ -126,7 +153,7 @@ export function buildWagmiConfig(args: {
     [
       {
         groupName: "Recommended",
-        wallets: [injectedWallet, rabbyWallet, ...wcWallets],
+        wallets: [injectedWallet, rabbyWallet, safeAppWallet, ...wcWallets],
       },
     ],
     {

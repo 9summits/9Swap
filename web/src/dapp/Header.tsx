@@ -124,7 +124,7 @@ function ChainMark({ chain, size = 18 }: { chain: ChainMeta; size?: number }) {
 /* ------------------------------ chain selector ---------------------------- */
 // Dropdown over the `chains` prop, styled as the prototype's ChainChip. Clicking
 // opens a small popover of the available chains; selecting one calls onChain.
-function ChainSelector({ chains, chain, onChain }: HeaderProps) {
+function ChainSelector({ chains, chain, onChain, locked }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
 
@@ -146,8 +146,9 @@ function ChainSelector({ chains, chain, onChain }: HeaderProps) {
   }, [open]);
 
   // Single chain → render a static (non-interactive) chip, matching the
-  // prototype's look with no dropdown affordance.
-  const interactive = chains.length > 1;
+  // prototype's look with no dropdown affordance. Same when the chain is
+  // locked (Safe App: the host Safe owns the network).
+  const interactive = chains.length > 1 && !locked;
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
@@ -157,6 +158,7 @@ function ChainSelector({ chains, chain, onChain }: HeaderProps) {
         onClick={interactive ? () => setOpen((v) => !v) : undefined}
         aria-haspopup={interactive ? "listbox" : undefined}
         aria-expanded={interactive ? open : undefined}
+        title={locked ? "Chain is set by the Safe" : undefined}
       >
         <ChainMark chain={chain} />
         <span style={s.chainName} data-chain-name>{chain.name}</span>
@@ -475,7 +477,7 @@ function WalletControl() {
 /* --------------------------------- header --------------------------------- */
 // Three columns on one row: brand | install pill (true center) | chain+wallet.
 // Grid 1fr auto 1fr keeps brand/wallet on the sides without pushing height.
-export function Header({ chains, chain, onChain }: HeaderProps) {
+export function Header({ chains, chain, onChain, locked }: HeaderProps) {
   return (
     <header style={s.header}>
       <div style={s.headerInner} data-dapp-header-inner>
@@ -498,7 +500,12 @@ export function Header({ chains, chain, onChain }: HeaderProps) {
           <InstallCliBar />
         </div>
         <div style={s.sideRight}>
-          <ChainSelector chains={chains} chain={chain} onChain={onChain} />
+          <ChainSelector
+            chains={chains}
+            chain={chain}
+            onChain={onChain}
+            locked={locked}
+          />
           <WalletControl />
         </div>
       </div>

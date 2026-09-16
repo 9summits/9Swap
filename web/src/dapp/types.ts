@@ -341,4 +341,5 @@ export interface HeaderProps {
   chains: ChainMeta[];
   chain: ChainMeta;
   onChain: (chain: ChainMeta) => void;
+  locked?: boolean;
 }

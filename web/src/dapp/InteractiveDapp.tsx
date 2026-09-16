@@ -1,5 +1,5 @@
 import React from "react";
-import { useAccount } from "wagmi";
+import { useAccount, useConnect } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { IconKeyframes, Icon } from "./icons";
 import { Header } from "./Header";
@@ -201,11 +201,37 @@ export function InteractiveDapp({ mode, sid }: { mode: ApiMode; sid: string }) {
   }, [pairBalances, portfolioBalances]);
 
   // ---- wallet ----
-  const { address, chainId: walletChainId, connector } = useAccount();
+  const { address, chainId: walletChainId, connector, status } = useAccount();
+  const { connect, connectors } = useConnect();
   useDisconnectCompletion();
   const connected = !!address;
   // RainbowKit's modal opener (undefined while already connected / mid-open).
   const { openConnectModal } = useConnectModal();
+
+  // Inside a Safe App iframe the user never gets to click Connect, so we do it
+  // for them. wagmi's own reconnect() is not enough: the safe connector's
+  // isAuthorized() swallows the getInfo timeout in a bare catch and answers
+  // false, so a first load inside the Safe would otherwise stay disconnected.
+  const safeAutoConnectFired = React.useRef(false);
+  React.useEffect(() => {
+    if (status !== "disconnected" || safeAutoConnectFired.current) return;
+    if (typeof window === "undefined" || window.parent === window) return;
+    const safeConnector = connectors.find((c) => c.id === "safe");
+    if (!safeConnector) return;
+    safeAutoConnectFired.current = true;
+    connect({ connector: safeConnector });
+  }, [status, connectors, connect]);
+
+  // The Safe picks the network, not us: mirror its chain into the form so the
+  // quote and the built tx target what the Safe can actually execute.
+  const chainLocked = connector?.id === "safe";
+  React.useEffect(() => {
+    if (!chainLocked || typeof walletChainId !== "number") return;
+    setChain((current) => {
+      if (current.chainId === walletChainId) return current;
+      return chains.find((c) => c.chainId === walletChainId) ?? current;
+    });
+  }, [chainLocked, walletChainId, chains]);
 
   // ---- execution ----
   const [exec, setExec] = React.useState<ExecState>({ phase: "idle" });
@@ -1048,7 +1074,12 @@ export function InteractiveDapp({ mode, sid }: { mode: ApiMode; sid: string }) {
         }`}</style>
       <IconKeyframes />
       <div data-dapp-connect>
-        <Header chains={chains} chain={chain} onChain={setChain} />
+        <Header
+          chains={chains}
+          chain={chain}
+          onChain={setChain}
+          locked={chainLocked}
+        />
       </div>
 
       <div style={d.body} data-dapp-body>
