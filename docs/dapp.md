@@ -298,8 +298,20 @@ rules, not app code:
 
 ### The safe connector
 
-`web/src/wagmi.ts` adds a Safe entry to the RainbowKit list, after `rabbyWallet`.
-It is RainbowKit's `safeWallet()` with one override: the connector is built from
+`web/src/wagmi.ts` decides the RainbowKit wallet list on `window.parent !==
+window`. Framed means inside `app.safe.global` (the CSP allowlist admits no other
+host), so the list is then the Safe entry **alone** and
+`multiInjectedProviderDiscovery` is off; unframed, the list is the usual
+`injectedWallet` / `rabbyWallet` / WalletConnect and the Safe entry is absent.
+Listing the other connectors inside the frame is not just noise: wagmi's
+`reconnect()` walks every connector in series and `useAccount()` reports no
+address while its status is `"connecting"`, and WalletConnect init plus the
+extensions' EIP-6963 probes took ~40 s inside the cross-origin iframe, during
+which the dApp sat on "Connect Wallet" with the Safe already authorized. With the
+Safe connector alone, reconnect is one `getInfo` round trip (~4 s measured on a
+Vercel preview).
+
+The Safe entry is RainbowKit's `safeWallet()` with one override: the connector is built from
 `safe({ allowedDomains: [/^https:\/\/app\.safe\.global$/], unstable_getInfoTimeout: 3000 })`
 instead of `safe()`'s defaults, whose `unstable_getInfoTimeout` is **10 ms**. That
 default loses the first `sdk.safe.getInfo()` round trip through the frame on load
@@ -309,10 +321,14 @@ never surfaces outside a Safe iframe. `@safe-global/safe-apps-sdk` and
 `@safe-global/safe-apps-provider` are lazy-imported by the connector and are
 already resolvable as transitive deps; neither is a direct dependency.
 
-`InteractiveDapp` auto-connects it. Once wagmi's `useAccount().status` reaches
-`"disconnected"` (reconnect finished and found nothing) and the page is framed,
-it calls `connect()` on the connector with `id === "safe"`, guarded by a ref so it
-runs once. wagmi's own `reconnect()` is not enough here: the safe connector's
+`InteractiveDapp` keeps a fallback auto-connect. Once wagmi's
+`useAccount().status` has passed through `"connecting"` / `"reconnecting"` and
+lands on `"disconnected"` (reconnect finished and found nothing) and the page is
+framed, it calls `connect()` on the connector with `id === "safe"`, guarded by a
+ref so it runs once. It waits for that pass on purpose: wagmi starts at
+`"disconnected"` before `reconnect()` runs and child effects fire first, so
+connecting immediately would race reconnect's own attempt and build two Safe SDK
+instances on one frame. wagmi's own `reconnect()` is not enough here: the safe connector's
 `isAuthorized()` wraps `getAccounts()` in a bare `catch` that swallows the
 `getInfo` timeout and answers `false`, so a first load inside the Safe would
 otherwise sit disconnected.

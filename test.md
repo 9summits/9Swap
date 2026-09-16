@@ -138,3 +138,21 @@ The tested list is in `tests/e2e/helpers.ts` (`VENUE_CASES`) — each entry
 maps the backend name to the label shown by the dApp (see
 `web/src/dapp/venues.ts`) and its `kind` (`sync` / `async`). The spec
 (`tests/e2e/venues.spec.ts`) generates one test per entry.
+
+## Safe App probe (real surface)
+
+`scripts/safe-app-probe.ts` drives the deployed dApp inside `app.safe.global`
+with Playwright (real Chrome, real input events, so it can click inside the
+cross-origin iframe, which the browser extension cannot). It dismisses Safe's
+cookie banner with necessary cookies only, passes the custom-app warning, waits
+for the Safe auto-connect and prints how long it took, checks the chain chip is
+locked, picks a venue, clicks Swap and screenshots Safe's "Confirm transaction"
+modal, which must list the batch as `multiSend` with the approve and the swap as
+separate actions. Nothing is signed: the profile has no owner wallet.
+
+```
+APP_URL=https://<preview>.vercel.app OUT=/tmp/safe-probe bun run scripts/safe-app-probe.ts
+```
+
+`SAFE` (default `eth:0xC868…C85C`) and `VENUE` (default `KyberSwap`, a venue the
+Safe has no allowance for, so the batch carries two calls) are optional.
