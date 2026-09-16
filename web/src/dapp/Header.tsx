@@ -11,6 +11,14 @@ import { PrivacyPill } from "./PrivacyPill";
 
 // Chains flagged "New" in the picker. Remove an alias once it stops being news.
 const NEW_CHAIN_ALIASES = new Set(["arc"]);
+// Pulsing glow for that badge — flashy on purpose. Co-located with the picker
+// (like the other one-off keyframes in this app) so it disappears with the
+// set above; honours reduced-motion.
+const NEW_BADGE_CSS =
+  "@keyframes swaggNewPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,0,140,.6)}" +
+  "60%{box-shadow:0 0 0 6px rgba(255,0,140,0)}}" +
+  ".swaggNewBadge{animation:swaggNewPulse 1.5s ease-out infinite}" +
+  "@media (prefers-reduced-motion:reduce){.swaggNewBadge{animation:none}}";
 
 // dApp Header — ported from the swap prototype's <Header> + <ChainChip>
 // (/tmp/9s-design/ui_kits/swap/app.jsx). Left: the 9Summits "9" mark +
@@ -179,6 +187,7 @@ function ChainSelector({ chains, chain, onChain, locked }: HeaderProps) {
 
       {open && interactive && (
         <div role="listbox" style={s.menu}>
+          {chains.some((c) => NEW_CHAIN_ALIASES.has(c.alias)) && <style>{NEW_BADGE_CSS}</style>}
           {chains.map((c) => {
             const selected = c.alias === chain.alias;
             return (
@@ -205,7 +214,20 @@ function ChainSelector({ chains, chain, onChain, locked }: HeaderProps) {
                 <ChainMark chain={c} />
                 <span style={s.menuName}>{c.name}</span>
                 {NEW_CHAIN_ALIASES.has(c.alias) && (
-                  <Badge tone="brand" variant="soft" size="sm" aria-label="New chain">
+                  <Badge
+                    tone="brand"
+                    variant="solid"
+                    size="sm"
+                    className="swaggNewBadge"
+                    aria-label="New chain"
+                    style={{
+                      background: "linear-gradient(135deg, #ff008c, #ff5ca8)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.09em",
+                      fontSize: 10,
+                      padding: "1px 7px",
+                    }}
+                  >
                     New
                   </Badge>
                 )}
