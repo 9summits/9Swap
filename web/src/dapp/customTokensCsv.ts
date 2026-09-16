@@ -8,10 +8,9 @@ export type CustomTokenChain = {
 };
 
 // Kept local so the web bundle never imports src/chains.ts. Must stay in
-// lockstep with CHAINS (eth/arc/arb/base/op/avax/bsc/hype/unichain/robinhood/monad/plasma/polygon/gnosis/ink).
+// lockstep with CHAINS (eth/arb/base/op/avax/bsc/hype/unichain/robinhood/arc/monad/plasma/polygon/gnosis/ink).
 export const CUSTOM_TOKEN_CHAINS: readonly CustomTokenChain[] = [
   { chainId: 1, alias: "eth", name: "Ethereum" },
-  { chainId: 5042, alias: "arc", name: "Arc" },
   { chainId: 42161, alias: "arb", name: "Arbitrum" },
   { chainId: 8453, alias: "base", name: "Base" },
   { chainId: 10, alias: "op", name: "Optimism" },
@@ -20,6 +19,7 @@ export const CUSTOM_TOKEN_CHAINS: readonly CustomTokenChain[] = [
   { chainId: 999, alias: "hype", name: "HyperEVM" },
   { chainId: 130, alias: "unichain", name: "Unichain" },
   { chainId: 4663, alias: "robinhood", name: "Robinhood" },
+  { chainId: 5042, alias: "arc", name: "Arc" },
   { chainId: 143, alias: "monad", name: "Monad" },
   { chainId: 9745, alias: "plasma", name: "Plasma" },
   { chainId: 137, alias: "polygon", name: "Polygon" },

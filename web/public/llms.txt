@@ -7,7 +7,7 @@ swap is a single product with two surfaces that share the same quote/build engin
 - **Web dApp** (this site): pick chain / tokens / amount, stream multi-venue quotes, connect a wallet (RainbowKit), approve and swap or sign an async order.
 - **CLI binary** `swap`: same ranking and build path from the terminal; optional local browser bridge (`--browser`) for signing.
 
-Supported chain aliases include `eth`, `arc`, `arb`, `base`, `op`, `avax`, `bsc`, `hype`, `unichain`, `robinhood`, `monad`, `plasma`, `polygon`, `gnosis`, `ink`. Sync venues include KyberSwap, Odos, Velora, 0x/Matcha, 1inch, Curve, Uniswap Classic. Intent venues (CoW, Velora Delta, UniswapX, 1inch Fusion, and related) need an explicit async opt-in on the CLI (`--allow-async`) and appear in the dApp when enabled server-side.
+Supported chain aliases include `eth`, `arb`, `base`, `op`, `avax`, `bsc`, `hype`, `unichain`, `robinhood`, `arc`, `monad`, `plasma`, `polygon`, `gnosis`, `ink`. Sync venues include KyberSwap, Odos, Velora, 0x/Matcha, 1inch, Curve, Uniswap Classic. Intent venues (CoW, Velora Delta, UniswapX, 1inch Fusion, and related) need an explicit async opt-in on the CLI (`--allow-async`) and appear in the dApp when enabled server-side.
 
 There is no separate marketing site, blog, or public pricing page. The SPA at `/` is the product UI. Source and contributor docs: https://github.com/9summits/9Swap.
 

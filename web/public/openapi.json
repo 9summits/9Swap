@@ -238,8 +238,8 @@
       "Error": { "type": "object", "required": ["error"], "properties": { "error": { "type": "string" } } },
       "ChainAlias": {
         "type": "string",
-        "enum": ["eth", "arc", "base", "arb", "op", "avax", "bsc", "hype", "unichain", "robinhood", "monad", "plasma", "polygon", "gnosis", "ink"],
-        "description": "eth=1, arc=5042, base=8453, arb=42161, op=10, avax=43114, bsc=56, hype=999, unichain=130, robinhood=4663, monad=143, plasma=9745, polygon=137, gnosis=100, ink=57073"
+        "enum": ["eth", "base", "arb", "op", "avax", "bsc", "hype", "unichain", "robinhood", "arc", "monad", "plasma", "polygon", "gnosis", "ink"],
+        "description": "eth=1, base=8453, arb=42161, op=10, avax=43114, bsc=56, hype=999, unichain=130, robinhood=4663, arc=5042, monad=143, plasma=9745, polygon=137, gnosis=100, ink=57073"
       },
       "Venue": {
         "type": "string",

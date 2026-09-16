@@ -1,6 +1,6 @@
 ---
 name: swap-cli
-description: Get the best DEX swap quote on EVM chains (Ethereum, Arc, Base, Arbitrum, Optimism, BNB, Avalanche, HyperEVM, Unichain, Robinhood, Monad, Plasma, Polygon, Gnosis, Ink) across KyberSwap, Velora, 0x, 1inch, Curve, Uniswap, OpenOcean, CoW, UniswapX and more, and build the executable calldata, simulate it, or hand it to a wallet. Use when a user asks for a token swap price, the best route or venue, exact-out (how much do I pay to receive X), to wrap/unwrap ETH, to send a token, or to prepare a swap transaction from the terminal.
+description: Get the best DEX swap quote on EVM chains (Ethereum, Base, Arbitrum, Optimism, BNB, Avalanche, HyperEVM, Unichain, Robinhood, Arc, Monad, Plasma, Polygon, Gnosis, Ink) across KyberSwap, Velora, 0x, 1inch, Curve, Uniswap, OpenOcean, CoW, UniswapX and more, and build the executable calldata, simulate it, or hand it to a wallet. Use when a user asks for a token swap price, the best route or venue, exact-out (how much do I pay to receive X), to wrap/unwrap ETH, to send a token, or to prepare a swap transaction from the terminal.
 ---
 
 # swap — DEX meta-aggregator CLI
@@ -35,7 +35,7 @@ Or `RPC_URL_<chainId>` (e.g. `RPC_URL_1`) for a specific RPC. Missing RPC config
 ## Core commands
 
 ```sh
-swap <amount> <tokenIn> <tokenOut> [--chain eth|arc|base|arb|op|avax|bsc|hype|unichain|robinhood|monad|plasma|polygon|gnosis|ink]
+swap <amount> <tokenIn> <tokenOut> [--chain eth|base|arb|op|avax|bsc|hype|unichain|robinhood|arc|monad|plasma|polygon|gnosis|ink]
 swap 1 WBTC ETH --json                      # every venue, ranked; machine output
 swap 1 WBTC ETH -s                          # just the amountOut number
 swap 1 WBTC ETH -v kyber,matcha             # subset of venues

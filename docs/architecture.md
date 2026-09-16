@@ -24,7 +24,7 @@ default `<amount>` is **tokenIn** (exact-in / sell). With `--exact-out` it is
 ```
 src/
   index.ts          entry point; commander wiring, orchestration
-  chains.ts         chain alias table (eth/arc/arb/base/op/bsc/avax/hype/unichain/robinhood/monad/plasma/polygon/gnosis/ink) — chainId, kyberPath, coingeckoPlatform, explorer, wrappedNative
+  chains.ts         chain alias table (eth/arb/base/op/bsc/avax/hype/unichain/robinhood/arc/monad/plasma/polygon/gnosis/ink) — chainId, kyberPath, coingeckoPlatform, explorer, wrappedNative
   tokens.ts         symbol/address → Token resolution (KyberSwap ks-setting → CoinGecko fallback)
   amount.ts         bigint base-unit conversion + USD formatting
   trade_side.ts     TradeSide sell|buy, BUY_CAPABLE_VENUES, amountIn XOR amountOut parsers

@@ -85,9 +85,9 @@ const PLACEHOLDER_PROJECT_ID = "00000000000000000000000000000000";
 // balance reads) for chains the wallet isn't currently on.
 export const knownChains: readonly [Chain, ...Chain[]] = [
   mainnet,
-  arc,
   base,
   robinhood,
+  arc,
   hyperEvm,
   ink,
   arbitrum,
@@ -238,7 +238,6 @@ export function buildWagmiConfig(args: {
     multiInjectedProviderDiscovery: !framed,
     transports: {
       [mainnet.id]: transportFor(mainnet.id),
-      [arc.id]: transportFor(arc.id),
       [arbitrum.id]: transportFor(arbitrum.id),
       [base.id]: transportFor(base.id),
       [optimism.id]: transportFor(optimism.id),
@@ -251,6 +250,7 @@ export function buildWagmiConfig(args: {
       [gnosis.id]: transportFor(gnosis.id),
       [ink.id]: transportFor(ink.id),
       [robinhood.id]: transportFor(robinhood.id),
+      [arc.id]: transportFor(arc.id),
       [monad.id]: transportFor(monad.id),
     },
   });

@@ -130,7 +130,7 @@ Common flags:
 | `-v <venue>` | one of `kyber`, `velora`, `matcha`, `1inch`, `curve`, `uniswap`, `openocean`, `cow`, `delta`, `uniswapx`, `fusion`, `ophis`, or `all` (default `all`). Comma-separated list also works — e.g. `-v kyber,velora,matcha` races just those three and prints a 3-row comparison block. Bypassed entirely when `tokenIn`/`tokenOut` are the native↔wrapped pair (auto wrap/unwrap) or `-a send` |
 | `--all` | alias for `-v all` (kept for muscle memory) |
 | `--allow-async` | include intent-based venues (`cow`, `delta`, `uniswapx`, `fusion`, `ophis`) — output is an EIP-712 order to sign + POST, not a tx |
-| `--chain <alias>` | `eth` (default), `arc`, `arb`, `base`, `op`, `avax`, `bsc`, `hype`, `unichain`, `robinhood`, `monad`, `plasma`, `polygon`, `gnosis`, `ink` |
+| `--chain <alias>` | `eth` (default), `arb`, `base`, `op`, `avax`, `bsc`, `hype`, `unichain`, `robinhood`, `arc`, `monad`, `plasma`, `polygon`, `gnosis`, `ink` |
 | `--slippage <pct>` | percent, e.g. `0.5` for 50 bps. Default `0.1` |
 | `--exact-out` | amount is denominated in **tokenOut** (buy exact-out): minimize tokenIn paid to receive that amount. Rejected for send/wrap/special actions |
 | `--from <addr>` | sender address (also reads `SENDER_ADDRESS`); required for `-d`, `--simulate`, `--browser`, `max` |
@@ -221,21 +221,21 @@ order's validity window.
 chain are raced; the rest are skipped silently. Snapshot of the adapters'
 chain tables (`*_SUPPORTED_CHAIN_IDS` / chain maps in `src/venues/*.ts`).
 
-| Venue | eth | arc | base | arb | op | unichain | bsc | avax | hype | robinhood | monad | plasma | polygon | gnosis | ink |
+| Venue | eth | base | arb | op | unichain | bsc | avax | hype | robinhood | arc | monad | plasma | polygon | gnosis | ink |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
 | `kyber` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | · |
-| `velora` (sync) | ✓ | · | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | · | · | · | ✓ | ✓ | · |
-| `matcha` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | ✓ | ✓ | · | ✓ |
+| `velora` (sync) | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | · | · | · | · | ✓ | ✓ | · |
+| `matcha` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ |
 | `1inch` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · |
-| `curve` (sync) | ✓ | · | ✓ | ✓ | ✓ | · | · | ✓ | · | · | · | · | · | ✓ | · |
-| `uniswap` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | ✓ | · | ✓ |
-| `openocean` (sync) | ✓ | ✓ | ✓ | ✓ | · | · | ✓ | ✓ | · | ✓ | · | · | ✓ | ✓ | · |
-| `cow` (intent) | ✓ | · | ✓ | ✓ | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
-| `ophis` (intent) | ✓ | · | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | · | ✓ | ✓ | ✓ | ✓ |
-| `delta` (intent) | ✓ | · | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | · | · | ✓ | · | · |
-| `uniswapx` (intent) | ✓ | · | ✓ | ✓ | · | ✓ | · | · | · | · | · | · | · | · | · |
-| `fusion` (intent) | ✓ | · | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | ✓ | ✓ | · |
-| *venues per chain* | 12 | 5 | 12 | 12 | 9 | 8 | 9 | 10 | 2 | 7 | 5 | 3 | 10 | 7 | 4 |
+| `curve` (sync) | ✓ | ✓ | ✓ | ✓ | · | · | ✓ | · | · | · | · | · | · | ✓ | · |
+| `uniswap` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | ✓ | · | ✓ | · | ✓ |
+| `openocean` (sync) | ✓ | ✓ | ✓ | · | · | ✓ | ✓ | · | ✓ | ✓ | · | · | ✓ | ✓ | · |
+| `cow` (intent) | ✓ | ✓ | ✓ | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+| `ophis` (intent) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | · | · | ✓ | ✓ | ✓ | ✓ |
+| `delta` (intent) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | · | · | · | ✓ | · | · |
+| `uniswapx` (intent) | ✓ | ✓ | ✓ | · | ✓ | · | · | · | · | · | · | · | · | · | · |
+| `fusion` (intent) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | · | ✓ | · | ✓ | ✓ | · |
+| *venues per chain* | 12 | 12 | 12 | 9 | 8 | 9 | 10 | 2 | 7 | 5 | 5 | 3 | 10 | 7 | 4 |
 
 API keys below are only needed with `--local` (self-host, your own venue
 keys); the default hosted mode already has every key-gated venue enabled

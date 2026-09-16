@@ -164,12 +164,12 @@ test("chain aliases are the CLI set", () => {
     "hype",
     "unichain",
     "robinhood",
+    "arc",
     "monad",
     "plasma",
     "polygon",
     "gnosis",
     "ink",
-    "arc",
   ];
   const rows: CustomTokenCsvRow[] = aliases.map((chain, i) => ({
     chain,

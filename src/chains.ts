@@ -1,6 +1,5 @@
 export type ChainAlias =
   | "eth"
-  | "arc"
   | "arb"
   | "base"
   | "op"
@@ -9,6 +8,7 @@ export type ChainAlias =
   | "hype"
   | "unichain"
   | "robinhood"
+  | "arc"
   | "monad"
   | "plasma"
   | "polygon"
@@ -58,33 +58,6 @@ export const CHAINS: Record<ChainAlias, ChainInfo> = {
     wrappedNative: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
     nativeErc20: null,
   },
-  // Arc (Circle's L1) — the gas token is USDC, not ETH.
-  //   - Two decimals for ONE balance: 18 at the EVM level (msg.value,
-  //     eth_getBalance, gas) but 6 through the ERC20 interface at
-  //     0x3600…0000 (symbol/name/decimals verified on-chain). Circle's docs
-  //     say to rely solely on the ERC20 view, so `nativeErc20` points at it
-  //     and the 0xeee… sentinel is rejected on this chain.
-  //   - No WETH9-style wrapper exists for native USDC → wrappedNative null,
-  //     wrap/unwrap short-circuit disabled. The bridged "WETH"
-  //     (0x128cC466…84EDB, Wrapped Ether, 18 dec) is bridged ETH, NOT a
-  //     wrapper of the native asset — never use it here.
-  //   - kyberPath "arc" verified live 2026-09-16 (aggregator + ks-setting
-  //     both answer for 5042).
-  //   - alchemySubdomain per docs.arc.io, but like robinhood the network is
-  //     opt-in per Alchemy app — set ARC_RPC_URL (or RPC_URL_5042) to
-  //     https://rpc.mainnet.arc.io if Alchemy 404s the network.
-  arc: {
-    alias: "arc",
-    chainId: 5042,
-    kyberPath: "arc",
-    displayName: "Arc",
-    nativeSymbol: "USDC",
-    explorer: "https://explorer.arc.io",
-    coingeckoPlatform: "arc",
-    alchemySubdomain: "arc-mainnet",
-    wrappedNative: null,
-    nativeErc20: "0x3600000000000000000000000000000000000000",
-  },
   base: {
     alias: "base",
     chainId: 8453,
@@ -117,6 +90,33 @@ export const CHAINS: Record<ChainAlias, ChainInfo> = {
     alchemySubdomain: "robinhood-mainnet",
     wrappedNative: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
     nativeErc20: null,
+  },
+  // Arc (Circle's L1) — the gas token is USDC, not ETH.
+  //   - Two decimals for ONE balance: 18 at the EVM level (msg.value,
+  //     eth_getBalance, gas) but 6 through the ERC20 interface at
+  //     0x3600…0000 (symbol/name/decimals verified on-chain). Circle's docs
+  //     say to rely solely on the ERC20 view, so `nativeErc20` points at it
+  //     and the 0xeee… sentinel is rejected on this chain.
+  //   - No WETH9-style wrapper exists for native USDC → wrappedNative null,
+  //     wrap/unwrap short-circuit disabled. The bridged "WETH"
+  //     (0x128cC466…84EDB, Wrapped Ether, 18 dec) is bridged ETH, NOT a
+  //     wrapper of the native asset — never use it here.
+  //   - kyberPath "arc" verified live 2026-09-16 (aggregator + ks-setting
+  //     both answer for 5042).
+  //   - alchemySubdomain per docs.arc.io, but like robinhood the network is
+  //     opt-in per Alchemy app — set ARC_RPC_URL (or RPC_URL_5042) to
+  //     https://rpc.mainnet.arc.io if Alchemy 404s the network.
+  arc: {
+    alias: "arc",
+    chainId: 5042,
+    kyberPath: "arc",
+    displayName: "Arc",
+    nativeSymbol: "USDC",
+    explorer: "https://explorer.arc.io",
+    coingeckoPlatform: "arc",
+    alchemySubdomain: "arc-mainnet",
+    wrappedNative: null,
+    nativeErc20: "0x3600000000000000000000000000000000000000",
   },
   hype: {
     alias: "hype",

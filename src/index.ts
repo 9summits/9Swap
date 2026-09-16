@@ -510,7 +510,7 @@ async function main(): Promise<void> {
       "--to <addr>",
       "recipient address — required with `-a send`",
     )
-    .option("-c, --chain <chain>", "chain alias (eth, arc, arb, base, op, avax, bsc, hype, unichain, robinhood, monad, plasma, polygon, gnosis, ink)", "eth")
+    .option("-c, --chain <chain>", "chain alias (eth, arb, base, op, avax, bsc, hype, unichain, robinhood, arc, monad, plasma, polygon, gnosis, ink)", "eth")
     .option<VenueArg>(
       "-v, --venue <venue>",
       `aggregator to query (${VENUE_OPTIONS.join(" | ")}) — comma-separated list also accepted, e.g. "kyber,odos,matcha"`,

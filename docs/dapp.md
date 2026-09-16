@@ -263,8 +263,8 @@ recipient is bound to `--from`). When matched it renders one of:
 
 ### Wagmi config (`web/src/wagmi.ts`)
 
-Known chains for the RainbowKit switcher: mainnet, arc, arbitrum, base, optimism, bsc,
-unichain, avalanche, hyperEvm, robinhood, monad, plasma, polygon, gnosis, ink. Transports use the
+Known chains for the RainbowKit switcher: mainnet, arbitrum, base, optimism, bsc,
+unichain, avalanche, hyperEvm, robinhood, arc, monad, plasma, polygon, gnosis, ink. Transports use the
 CORS-open URLs in `CORS_OPEN_RPC` (`shared/public_rpc.ts`), with the injected
 wallet provider first when it sits on the selected chain. The operator Alchemy
 key never reaches the browser.
