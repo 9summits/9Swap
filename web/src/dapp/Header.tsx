@@ -7,17 +7,13 @@ import { Icon } from "./icons";
 import { short, clogo, ctint } from "./venues";
 import type { HeaderProps, ChainMeta } from "./types";
 import { InstallCliBar } from "./InstallCliBar";
-
-// Anchor of the "03 Privacy" section inside the disclaimer page (same origin).
-const PRIVACY_URL = "/disclaimer.html#privacy";
-// Tooltip spelling out what the "No tracking" pill actually covers.
-const PRIVACY_TITLE =
-  "No accounts. No cookies. No trackers. No analytics script. No advertising. No personal data collection.";
+import { PrivacyPill } from "./PrivacyPill";
 
 // dApp Header — ported from the swap prototype's <Header> + <ChainChip>
 // (/tmp/9s-design/ui_kits/swap/app.jsx). Left: the 9Summits "9" mark +
 // "9Swap" wordmark, then the Beta badge and, next to it, the "No tracking"
-// pill linking to the disclaimer's Privacy section (hidden on phones).
+// pill (<PrivacyPill>, own file) linking to the disclaimer's Privacy section
+// (hidden on phones).
 // Center: install CLI pill (same row, never stacked above).
 // Right: chain selector + wallet connect (RainbowKit).
 //
@@ -491,17 +487,7 @@ export function Header({ chains, chain, onChain }: HeaderProps) {
               <Badge tone="brand" variant="soft" size="sm" aria-label="Beta">
                 Beta
               </Badge>
-              <a
-                href={PRIVACY_URL}
-                title={PRIVACY_TITLE}
-                aria-label="No tracking — read the privacy notice"
-                data-privacy-pill
-                style={s.privacyPill}
-              >
-                <Badge tone="neutral" variant="soft" size="sm">
-                  No tracking
-                </Badge>
-              </a>
+              <PrivacyPill />
             </div>
             <span style={s.brandSub} data-brand-sub>
               Swap CLI & Dapp Aggregator by 9Summits
@@ -579,8 +565,6 @@ const s: Record<string, React.CSSProperties> = {
     lineHeight: 1,
     whiteSpace: "nowrap",
   },
-  privacyPill: { display: "inline-flex", textDecoration: "none", color: "inherit" },
-
   // ChainChip (prototype d.chip), promoted to a real button.
   chip: {
     display: "inline-flex",
