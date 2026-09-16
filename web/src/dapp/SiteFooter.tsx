@@ -18,9 +18,9 @@ const COMMIT_URL =
     : GITHUB_URL;
 
 // Page footer for the interactive dApp: contact (click-to-copy email) + CLI
-// docs + disclaimer + open source (GitHub repo) + the no-tracking pledge
-// (anchored on the disclaimer's Privacy section) + the short git commit of
-// this dApp build (links to the matching GitHub commit), centered.
+// docs + disclaimer + the no-tracking pledge (anchored on the disclaimer's
+// Privacy section) + the short git commit of this dApp build (links to the
+// matching GitHub commit), centered.
 export function SiteFooter() {
   const [copied, setCopied] = React.useState(false);
   const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -66,19 +66,6 @@ export function SiteFooter() {
         </span>
         <a href={DISCLAIMER_URL} style={s.link}>
           <span>Disclaimer</span>
-        </a>
-        <span style={s.dot} aria-hidden>
-          ·
-        </span>
-        <a
-          href={GITHUB_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={s.link}
-          title="Source code on GitHub"
-        >
-          <span>Open source</span>
-          <span style={s.muted}>GitHub</span>
         </a>
         <span style={s.dot} aria-hidden>
           ·
