@@ -63,16 +63,115 @@ export async function waitForDappReady(page: Page): Promise<void> {
 // Address 0x1111…1111; RainbowKit lists it as "Mock Wallet".
 export const WALLET = "0x1111111111111111111111111111111111111111";
 
+// A batch id and a tx hash are different things and the dApp must not conflate
+// them: the id comes back from wallet_sendCalls immediately, the hash only once
+// the batch executes. Distinct values so a spec can tell which one the UI used.
+export const MOCK_BATCH_ID = "0x" + "ab".repeat(32);
+export const MOCK_BATCH_TX_HASH = "0x" + "cd".repeat(32);
+
+export type MockWalletOptions = {
+  // EIP-5792: also answer wallet_getCapabilities / wallet_sendCalls /
+  // wallet_getCallsStatus, so the dApp takes the atomic approve+swap path
+  // instead of two sequential eth_sendTransaction legs. Off by default — every
+  // other spec exercises the sequential path.
+  atomic?: boolean;
+};
+
+// Everything the init script needs, serialized into the page (it runs there, so
+// it can't close over anything in this module).
+type MockWalletInit = {
+  address: string;
+  atomic: boolean;
+  batchId: string;
+  txHash: string;
+  tokenOut: string;
+};
+
 // Minimal EIP-1193 provider + EIP-6963 announce, installed before any app code
 // runs. wagmi's MIPD discovers it and RainbowKit lists it as "Mock Wallet".
 // Reads (balances, block watch) route through it via the walletAware transport;
 // they resolve to zero/empty — the button only needs connected + a live quote.
-export function installMockWallet(page: Page): Promise<void> {
-  return page.addInitScript((address: string) => {
+export async function installMockWallet(
+  page: Page,
+  options: MockWalletOptions = {},
+): Promise<void> {
+  const init: MockWalletInit = {
+    address: WALLET,
+    atomic: !!options.atomic,
+    batchId: MOCK_BATCH_ID,
+    txHash: MOCK_BATCH_TX_HASH,
+    tokenOut: USDT,
+  };
+  await page.addInitScript((o: MockWalletInit) => {
+    const { address, atomic, batchId, txHash, tokenOut } = o;
     const CHAIN_ID = "0x1"; // mainnet — matches the eth deep link
+    const word = (n: number) => "0x" + n.toString(16).padStart(64, "0");
+    const topic = (addr: string) =>
+      "0x" + addr.toLowerCase().replace(/^0x/, "").padStart(64, "0");
+    // keccak256("Transfer(address,address,uint256)")
+    const TRANSFER_TOPIC =
+      "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+    // 100,000 USDT (6 decimals) landing on the connected account — the figure
+    // the execution summary must read back out of the batch receipt.
+    const RECEIVED = 100_000 * 1e6;
+    const BATCH_RECEIPT = {
+      logs: [
+        {
+          address: tokenOut,
+          topics: [
+            TRANSFER_TOPIC,
+            topic("0x2222222222222222222222222222222222222222"),
+            topic(address),
+          ],
+          data: word(RECEIVED),
+        },
+      ],
+      status: "0x1",
+      blockHash: "0x" + "11".repeat(32),
+      blockNumber: "0x1",
+      gasUsed: "0x5208",
+      transactionHash: txHash,
+    };
+    const mock = window as unknown as {
+      __mockSendCalls?: unknown[];
+      __mockCallsStatusPolls?: number;
+    };
     const listeners: Record<string, Array<(x: unknown) => void>> = {};
     const provider = {
-      request: async ({ method }: { method: string; params?: unknown }) => {
+      request: async ({
+        method,
+        params,
+      }: {
+        method: string;
+        params?: unknown;
+      }) => {
+        const args = (params ?? []) as unknown[];
+        if (atomic) {
+          switch (method) {
+            case "wallet_getCapabilities":
+              return { [CHAIN_ID]: { atomic: { status: "supported" } } };
+            case "wallet_sendCalls":
+              (mock.__mockSendCalls = mock.__mockSendCalls ?? []).push(args[0]);
+              return { id: batchId };
+            case "wallet_getCallsStatus": {
+              const polls = (mock.__mockCallsStatusPolls =
+                (mock.__mockCallsStatusPolls ?? 0) + 1);
+              const base = {
+                version: "2.0.0",
+                id: args[0],
+                chainId: CHAIN_ID,
+                atomic: true,
+              };
+              // Two pending rounds first: a Safe sits queued until the
+              // remaining owners confirm, and the dApp must keep polling
+              // rather than treat the first answer as terminal. A Safe then
+              // repeats the same receipt once per call in the batch.
+              return polls <= 2
+                ? { ...base, status: 100 }
+                : { ...base, status: 200, receipts: [BATCH_RECEIPT, BATCH_RECEIPT] };
+            }
+          }
+        }
         switch (method) {
           case "eth_requestAccounts":
           case "eth_accounts":
@@ -88,9 +187,18 @@ export function installMockWallet(page: Page): Promise<void> {
             return "0x0";
           case "eth_blockNumber":
             return "0x1";
-          case "eth_call":
-            // 32-byte zero: a balanceOf() decode yields 0n instead of throwing.
+          case "eth_call": {
+            // The dApp reads the pay/receive balances through the connected
+            // wallet's provider, one plain eth_call per token (viem's public
+            // client has multicall batching off), so a fat balanceOf lands the
+            // account a spendable 1,000,000 of each side. Everything else — the
+            // allowance probe included — stays zero: a 32-byte zero decodes to
+            // 0n instead of throwing.
+            const call = (args[0] ?? {}) as { data?: string };
+            const selector = (call.data ?? "").slice(0, 10).toLowerCase();
+            if (atomic && selector === "0x70a08231") return word(1_000_000 * 1e6);
             return "0x" + "0".repeat(64);
+          }
           case "eth_getBlockByNumber":
             return { number: "0x1", timestamp: "0x0", baseFeePerGas: "0x1" };
           default:
@@ -127,7 +235,7 @@ export function installMockWallet(page: Page): Promise<void> {
       );
     window.addEventListener("eip6963:requestProvider", announce);
     announce();
-  }, WALLET);
+  }, init);
 }
 
 // Open RainbowKit's modal and pick the mock wallet; resolves once no
