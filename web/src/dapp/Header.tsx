@@ -146,8 +146,7 @@ function ChainSelector({ chains, chain, onChain, locked }: HeaderProps) {
   }, [open]);
 
   // Single chain → render a static (non-interactive) chip, matching the
-  // prototype's look with no dropdown affordance. Same when the chain is
-  // locked (Safe App: the host Safe owns the network).
+  // prototype's look with no dropdown affordance.
   const interactive = chains.length > 1 && !locked;
 
   return (

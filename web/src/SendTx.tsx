@@ -34,9 +34,6 @@ function ButtonSpinner() {
 // form's action button can mirror the real step — Approve… → Confirm… → done —
 // instead of spinning on a static label forever.
 export type SendTxRun = {
-  // "queued": the wallet accepted an EIP-5792 batch (we hold its id) but no
-  // execution has been observed on-chain yet. Through a Safe that can last
-  // hours, until the remaining owners confirm.
   stage: "approve" | "swap" | "queued" | "done" | "error";
   pending: boolean; // wallet confirmation prompt is open
   confirming: boolean; // tx broadcast, waiting for the receipt
@@ -44,8 +41,6 @@ export type SendTxRun = {
   explorerUrl?: string;
 };
 
-// One accepted wallet_sendCalls batch. The id lives in the states that have
-// one, so "queued without an id" can't be built.
 type AtomicRun =
   | { kind: "idle" }
   | { kind: "sending" }
@@ -239,7 +234,6 @@ export function SendTx({
     chainId: chain.chainId,
   });
 
-  // Atomic path: approve + swap as one wallet_sendCalls batch.
   const [atomicRun, setAtomicRun] = useState<AtomicRun>({ kind: "idle" });
   const { sendCallsAsync } = useSendCalls();
   // Same id for "queued" and "done" so the query key never changes and the
@@ -345,7 +339,7 @@ export function SendTx({
   const atomicFired = useRef(false);
   useEffect(() => {
     // Firing before the capability probe settles would pick the executor by
-    // coin flip — and on a Safe the sequential one never completes.
+    // coin flip, and on a Safe the sequential one never completes.
     if (!autoStart || !address || !executorResolved) return;
     if (atomic) {
       if (!atomicFired.current) void clickAtomic();
@@ -457,9 +451,6 @@ export function SendTx({
     void clickAtomic();
   }
 
-  // `retry: true` retries forever, so a poll that never recovers leaves the UI
-  // on "queued" with nothing to debug from. Breadcrumb only: the batch is with
-  // the wallet either way, and a transient miss must not become a run error.
   const pollErrorLogged = useRef(false);
   useEffect(() => {
     if (!batchStatus.error || pollErrorLogged.current) return;
@@ -518,7 +509,6 @@ export function SendTx({
       : `${fmt(amountIn, tokenIn.decimals)} ${tokenIn.symbol}`;
   const outputAmountLabel = `${fmt(amountOut, tokenOut.decimals)} ${tokenOut.symbol}`;
 
-  // Atomic mode ships approve + swap as one batch, so there is no "step 1".
   const stepped = needsApprove && !atomic;
   const headers = (() => {
     if (mode === "wrap") {
@@ -673,8 +663,6 @@ export function SendTx({
               : null
             : (swapHook.data ?? approveHook.data ?? null)
         }
-        // A batch id is not a tx hash, so no explorer link until the batch
-        // executes and hands us the real one.
         href={atomic && atomicRun.kind === "queued" ? null : undefined}
         explorer={chain.explorer}
         onRetry={onRetry}

@@ -1,5 +1,3 @@
-// Drives the deployed dApp as a custom Safe App and captures Safe's transaction
-// review modal. See test.md, "Safe App probe".
 import { chromium } from "@playwright/test";
 
 const APP_URL = process.env.APP_URL ?? "https://swap.9summits.io";

@@ -13,24 +13,15 @@ import {
   expectVenueQuotes,
 } from "./helpers";
 
-// E2E: the EIP-5792 atomic path. A wallet whose wallet_getCapabilities reports
-// atomic.status "supported" (a Safe, or any 7702-upgraded account) must get
-// approve + swap as ONE wallet_sendCalls batch instead of two sequential
-// eth_sendTransaction legs — through a Safe the sequential path can never
-// complete, since eth_sendTransaction hands back a safeTxHash no public RPC
-// will ever have a receipt for.
-//
-// The trade is the battery's usual live one (100,000 USDC → USDT on mainnet via
-// KyberSwap), so the quote and the /api/build payload are real; only the wallet
-// is mocked (see installMockWallet's atomic mode in helpers.ts for the batch
-// lifecycle it replays). 0x1111…1111 holds no USDC allowance on-chain, so the
-// server's allowance probe puts an approve tx in the payload and the batch must
-// carry two calls.
+// E2E: a wallet whose wallet_getCapabilities reports atomic "supported" must
+// get approve + swap as ONE wallet_sendCalls batch. Through a Safe the
+// sequential path can never complete: eth_sendTransaction hands back a
+// safeTxHash no public RPC will ever have a receipt for. Only the wallet is
+// mocked; the quote and the /api/build payload are the battery's live trade.
 
 const CHAIN_ID_HEX = "0x1";
 const APPROVE_SELECTOR = "0x095ea7b3";
 
-// What wagmi/viem hand the wallet as wallet_sendCalls params[0].
 type SendCallsBundle = {
   atomicRequired: boolean;
   chainId: string;
@@ -38,13 +29,11 @@ type SendCallsBundle = {
   calls: { to: string; data: string; value?: string }[];
 };
 
-// The slice of POST /api/build the batch must carry verbatim.
 type BuiltPayload = {
   tx: { to: string; data: string };
   approval: { approveTx: { to: string; data: string } | null } | null;
 };
 
-// SendTx.shorten / ExecStatus.shortHash → `0xabab…abab`, `0xcdcd…cdcd`.
 const short = (h: string) => `${h.slice(0, 6)}…${h.slice(-4)}`;
 const shortBatchId = short(MOCK_BATCH_ID);
 const shortTxHash = short(MOCK_BATCH_TX_HASH);
@@ -60,8 +49,6 @@ test.describe("dApp · EIP-5792 atomic batch · 100k USDC→USDT mainnet", () =>
   test(`approve + swap ship as one wallet_sendCalls batch (${AMOUNT} USDC→USDT via KyberSwap)`, async ({
     page,
   }, testInfo) => {
-    // Live quote (≤30s) + /api/build (≤15s) + three 4s wallet_getCallsStatus
-    // rounds, on top of connect and first paint — past the 90s battery default.
     test.setTimeout(150_000);
 
     await installMockWallet(page, { atomic: true });
@@ -173,8 +160,6 @@ test.describe("dApp · EIP-5792 atomic batch · 100k USDC→USDT mainnet", () =>
       page.getByRole("button", { name: "Swap confirmed" }),
       "the batch reported status 200, so the action button must leave its busy state",
     ).toBeVisible();
-    // This row renders only under ExecStatusView's phase==="done" branch, so it
-    // doubles as the proof that the compact exec panel reached its done state.
     await expect(
       page.getByText(/^\+ 100000(\.0+)? USDT$/),
       "the received amount must be decoded from the batch receipt's Transfer log (100,000 USDT), not fall back to the quoted estimate",

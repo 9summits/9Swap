@@ -63,17 +63,10 @@ export async function waitForDappReady(page: Page): Promise<void> {
 // Address 0x1111…1111; RainbowKit lists it as "Mock Wallet".
 export const WALLET = "0x1111111111111111111111111111111111111111";
 
-// A batch id and a tx hash are different things and the dApp must not conflate
-// them: the id comes back from wallet_sendCalls immediately, the hash only once
-// the batch executes. Distinct values so a spec can tell which one the UI used.
 export const MOCK_BATCH_ID = "0x" + "ab".repeat(32);
 export const MOCK_BATCH_TX_HASH = "0x" + "cd".repeat(32);
 
 export type MockWalletOptions = {
-  // EIP-5792: also answer wallet_getCapabilities / wallet_sendCalls /
-  // wallet_getCallsStatus, so the dApp takes the atomic approve+swap path
-  // instead of two sequential eth_sendTransaction legs. Off by default — every
-  // other spec exercises the sequential path.
   atomic?: boolean;
 };
 
@@ -108,11 +101,8 @@ export async function installMockWallet(
     const word = (n: number) => "0x" + n.toString(16).padStart(64, "0");
     const topic = (addr: string) =>
       "0x" + addr.toLowerCase().replace(/^0x/, "").padStart(64, "0");
-    // keccak256("Transfer(address,address,uint256)")
     const TRANSFER_TOPIC =
       "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
-    // 100,000 USDT (6 decimals) landing on the connected account — the figure
-    // the execution summary must read back out of the batch receipt.
     const RECEIVED = 100_000 * 1e6;
     const BATCH_RECEIPT = {
       logs: [
@@ -188,12 +178,6 @@ export async function installMockWallet(
           case "eth_blockNumber":
             return "0x1";
           case "eth_call": {
-            // The dApp reads the pay/receive balances through the connected
-            // wallet's provider, one plain eth_call per token (viem's public
-            // client has multicall batching off), so a fat balanceOf lands the
-            // account a spendable 1,000,000 of each side. Everything else — the
-            // allowance probe included — stays zero: a 32-byte zero decodes to
-            // 0n instead of throwing.
             const call = (args[0] ?? {}) as { data?: string };
             const selector = (call.data ?? "").slice(0, 10).toLowerCase();
             if (atomic && selector === "0x70a08231") return word(1_000_000 * 1e6);

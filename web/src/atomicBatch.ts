@@ -21,9 +21,6 @@ export function useExecutor(chainId: number): {
     query: { enabled: !!address, retry: false, staleTime: Infinity },
   });
 
-  // A wallet with no wallet_getCapabilities rejects the request — expected for
-  // most EOAs, so it is info, not a fault. Logged once per hook instance so a
-  // re-render storm can't flood the console.
   const loggedRef = useRef(false);
   useEffect(() => {
     if (!isError || loggedRef.current) return;
