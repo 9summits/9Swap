@@ -1027,6 +1027,9 @@ export function InteractiveDapp({ mode, sid }: { mode: ApiMode; sid: string }) {
              brand subtitle (the wide Connect Wallet button needs the room). */
           [data-chain-name]{display:none;}
           [data-brand-sub]{display:none;}
+          /* brand + wallet row has no room for a second pill on a phone; the
+             info stays reachable via the footer's Disclaimer link. */
+          [data-privacy-pill]{display:none !important;}
           [data-dapp-body]{padding:16px 12px 64px !important;overflow-x:clip;}
           [data-dapp-grid]{grid-template-columns:1fr !important;gap:16px !important;}
           [data-slot="swap"]{order:1;}
