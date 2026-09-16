@@ -151,11 +151,12 @@ test("shouldHoldQuotes: building and in-flight ready", () => {
   expect(shouldHoldQuotes({ execPhase: "ready", runStage: "swap" })).toBe(true);
 });
 
-test("shouldHoldQuotes: idle / error / terminal ready", () => {
+test("shouldHoldQuotes: idle / error / terminal / queued ready", () => {
   expect(shouldHoldQuotes({ execPhase: "idle", runStage: null })).toBe(false);
   expect(shouldHoldQuotes({ execPhase: "error", runStage: null })).toBe(false);
   expect(shouldHoldQuotes({ execPhase: "ready", runStage: "done" })).toBe(false);
   expect(shouldHoldQuotes({ execPhase: "ready", runStage: "error" })).toBe(false);
+  expect(shouldHoldQuotes({ execPhase: "ready", runStage: "queued" })).toBe(false);
 });
 
 test("upsertRawRoute inserts then replaces by venue", () => {

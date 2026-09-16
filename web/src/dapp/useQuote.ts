@@ -59,13 +59,20 @@ export function shouldAutoRefresh(args: {
 
 // Hold the displayed quote while a swap is being built or signed. `runStage`
 // is null between setExec(ready) and the first SendTx onPhase report.
+// A queued EIP-5792 batch counts as terminal here even though it hasn't
+// executed: through a Safe it can sit for hours waiting on the other owners,
+// and a quote frozen that long is worse than one that keeps refreshing.
 export function shouldHoldQuotes(args: {
   execPhase: "idle" | "building" | "error" | "ready";
-  runStage: "approve" | "swap" | "done" | "error" | null | undefined;
+  runStage: "approve" | "swap" | "queued" | "done" | "error" | null | undefined;
 }): boolean {
   if (args.execPhase === "building") return true;
   if (args.execPhase !== "ready") return false;
-  return args.runStage !== "done" && args.runStage !== "error";
+  return (
+    args.runStage !== "done" &&
+    args.runStage !== "error" &&
+    args.runStage !== "queued"
+  );
 }
 
 export function upsertRawRoute(raw: RawRoute[], route: RawRoute): void {

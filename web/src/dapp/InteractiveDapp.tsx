@@ -1025,6 +1025,12 @@ export function InteractiveDapp({ mode, sid }: { mode: ApiMode; sid: string }) {
         : r.pending
           ? "Confirm approval in your wallet…"
           : `Approve ${sym}`;
+    } else if (r?.stage === "queued") {
+      // The batch is with the wallet (a Safe may need more owner signatures),
+      // so the button stays enabled: starting another swap is legitimate.
+      actionBusy = false;
+      actionDone = false;
+      actionLabel = "Batch queued · waiting for execution";
     } else {
       // swap leg (or run not yet reported)
       actionBusy = true;

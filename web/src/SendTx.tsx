@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
   useAccount,
+  useCallsStatus,
+  useSendCalls,
   useSendTransaction,
   useSwitchChain,
 } from "wagmi";
@@ -16,6 +18,7 @@ import { reportDone, simulate } from "./api";
 import { ExecStatusView, type ExecPhase, type SummaryRow } from "./dapp/ExecStatus";
 import { Icon, IconKeyframes } from "./dapp/icons";
 import { useTxReceipt } from "./useTxReceipt";
+import { useExecutor } from "./atomicBatch";
 
 // Inline spinner for the legacy panel's "waiting for confirmation…" button
 // states. Needs <IconKeyframes /> mounted in the same tree — the legacy
@@ -31,12 +34,44 @@ function ButtonSpinner() {
 // form's action button can mirror the real step — Approve… → Confirm… → done —
 // instead of spinning on a static label forever.
 export type SendTxRun = {
-  stage: "approve" | "swap" | "done" | "error";
+  // "queued": the wallet accepted an EIP-5792 batch (we hold its id) but no
+  // execution has been observed on-chain yet. Through a Safe that can last
+  // hours, until the remaining owners confirm.
+  stage: "approve" | "swap" | "queued" | "done" | "error";
   pending: boolean; // wallet confirmation prompt is open
   confirming: boolean; // tx broadcast, waiting for the receipt
   error: string | null;
   explorerUrl?: string;
 };
+
+// One accepted wallet_sendCalls batch. The id lives in the states that have
+// one, so "queued without an id" can't be built.
+type AtomicRun =
+  | { kind: "idle" }
+  | { kind: "sending" }
+  | { kind: "queued"; id: string }
+  | { kind: "done"; id: string; hash: string }
+  | { kind: "error"; message: string };
+
+// The receipt fields the execution summary reads, all optional: an injected
+// wallet's RPC can answer null for any of them, and an EIP-5792 call receipt
+// carries no effectiveGasPrice at all.
+type ReceiptFields = {
+  logs?: readonly { address: string; topics: readonly string[]; data: string }[];
+  blockNumber?: bigint | null;
+  gasUsed?: bigint | null;
+  effectiveGasPrice?: bigint | null;
+};
+
+function batchTerminal(data?: { status?: string }): boolean {
+  return data?.status === "success" || data?.status === "failure";
+}
+
+function errMessage(e: unknown): string {
+  const short = (e as { shortMessage?: string } | undefined)?.shortMessage;
+  if (short) return short;
+  return e instanceof Error ? e.message : String(e);
+}
 
 // keccak256("Transfer(address,address,uint256)") — ERC20 Transfer event topic0.
 const TRANSFER_TOPIC =
@@ -153,6 +188,8 @@ export function SendTx({
 }) {
   const { address, chainId: connectedChainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
+  const { executor, resolved: executorResolved } = useExecutor(chain.chainId);
+  const atomic = executor === "atomic";
 
   const mode = deriveMode({
     venue,
@@ -202,6 +239,31 @@ export function SendTx({
     chainId: chain.chainId,
   });
 
+  // Atomic path: approve + swap as one wallet_sendCalls batch.
+  const [atomicRun, setAtomicRun] = useState<AtomicRun>({ kind: "idle" });
+  const { sendCallsAsync } = useSendCalls();
+  // Same id for "queued" and "done" so the query key never changes and the
+  // receipt that feeds the summary survives the transition.
+  const pollId =
+    atomicRun.kind === "queued" || atomicRun.kind === "done"
+      ? atomicRun.id
+      : null;
+  const batchStatus = useCallsStatus({
+    id: pollId ?? "",
+    query: {
+      enabled: !!pollId,
+      refetchInterval: (q) => (batchTerminal(q.state.data) ? false : 4000),
+      // Right after a Safe proposal the Safe tx service has not indexed the
+      // batch yet and wallet_getCallsStatus throws. Retrying is the whole
+      // point; only a returned status of "failure" is a real failure.
+      retry: true,
+    },
+  });
+  const batchReceipts = batchStatus.data?.receipts;
+  // A Safe repeats the same receipt once per call in the batch, so the last
+  // entry is the swap.
+  const batchReceipt = batchReceipts?.[batchReceipts.length - 1];
+
   // Advance step machine when receipts land.
   useEffect(() => {
     if (step === "approve" && approveReceipt.isSuccess) setStep("swap");
@@ -228,19 +290,39 @@ export function SendTx({
   // silently fell back to "opening your wallet…" after an on-chain revert,
   // with no error and no retry.
   const approving = needsApprove && step === "approve";
-  const runError =
-    chainErr ??
-    swapHook.error?.message ??
-    approveHook.error?.message ??
-    swapReceipt.error?.message ??
-    approveReceipt.error?.message ??
-    null;
-  const runStage: SendTxRun["stage"] =
-    step === "done" ? "done" : runError ? "error" : approving ? "approve" : "swap";
-  const runPending = approving ? approveHook.isPending : swapHook.isPending;
-  const runConfirming = approving
-    ? approveReceipt.isLoading
-    : swapReceipt.isLoading;
+  const runError = atomic
+    ? (chainErr ?? (atomicRun.kind === "error" ? atomicRun.message : null))
+    : (chainErr ??
+      swapHook.error?.message ??
+      approveHook.error?.message ??
+      swapReceipt.error?.message ??
+      approveReceipt.error?.message ??
+      null);
+  const runStage: SendTxRun["stage"] = atomic
+    ? atomicRun.kind === "done"
+      ? "done"
+      : runError
+        ? "error"
+        : atomicRun.kind === "queued"
+          ? "queued"
+          : "swap"
+    : step === "done"
+      ? "done"
+      : runError
+        ? "error"
+        : approving
+          ? "approve"
+          : "swap";
+  const runPending = atomic
+    ? atomicRun.kind === "sending"
+    : approving
+      ? approveHook.isPending
+      : swapHook.isPending;
+  const runConfirming = atomic
+    ? atomicRun.kind === "queued"
+    : approving
+      ? approveReceipt.isLoading
+      : swapReceipt.isLoading;
 
   // onPhase identity may churn each render; keep it in a ref so the effect fires
   // on actual state transitions, not on every parent re-render.
@@ -260,8 +342,15 @@ export function SendTx({
   // Refs guard each leg so it never double-fires across re-renders.
   const autoApproveFired = useRef(false);
   const autoSwapFired = useRef(false);
+  const atomicFired = useRef(false);
   useEffect(() => {
-    if (!autoStart || !address) return;
+    // Firing before the capability probe settles would pick the executor by
+    // coin flip — and on a Safe the sequential one never completes.
+    if (!autoStart || !address || !executorResolved) return;
+    if (atomic) {
+      if (!atomicFired.current) void clickAtomic();
+      return;
+    }
     if (
       step === "approve" &&
       needsApprove &&
@@ -276,7 +365,7 @@ export function SendTx({
       void clickSwap();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoStart, address, step, needsApprove]);
+  }, [autoStart, address, step, needsApprove, atomic, executorResolved]);
 
   const wrongChain =
     typeof connectedChainId === "number" && connectedChainId !== chain.chainId;
@@ -325,7 +414,99 @@ export function SendTx({
     });
   }
 
+  async function clickAtomic() {
+    atomicFired.current = true;
+    if (!(await ensureChain())) return;
+    // The approve target is approveTx.to, never tx.to: Velora's spender
+    // diverges from its tx target.
+    const calls = [
+      ...(needsApprove && approveTx
+        ? [
+            {
+              to: approveTx.to as Hex,
+              data: approveTx.data as Hex,
+              value: BigInt(approveTx.value || "0"),
+            },
+          ]
+        : []),
+      {
+        to: tx.to as Hex,
+        data: tx.data as Hex,
+        value: BigInt(tx.value || "0"),
+      },
+    ];
+    setAtomicRun({ kind: "sending" });
+    try {
+      // experimental_fallback stays off: it would silently degrade to
+      // sequential eth_sendTransaction under a synthetic id, and we only get
+      // here because the wallet already said atomic batching is supported.
+      const { id } = await sendCallsAsync({
+        calls,
+        chainId: chain.chainId,
+        forceAtomic: true,
+      });
+      setAtomicRun({ kind: "queued", id });
+    } catch (e) {
+      console.warn("SendTx: wallet_sendCalls failed", e);
+      setAtomicRun({ kind: "error", message: errMessage(e) });
+    }
+  }
+
+  function retryAtomic() {
+    atomicFired.current = false;
+    void clickAtomic();
+  }
+
+  // `retry: true` retries forever, so a poll that never recovers leaves the UI
+  // on "queued" with nothing to debug from. Breadcrumb only: the batch is with
+  // the wallet either way, and a transient miss must not become a run error.
+  const pollErrorLogged = useRef(false);
+  useEffect(() => {
+    if (!batchStatus.error || pollErrorLogged.current) return;
+    pollErrorLogged.current = true;
+    console.info(
+      "SendTx: wallet_getCallsStatus poll failed, retrying",
+      batchStatus.error,
+    );
+  }, [batchStatus.error]);
+
+  const atomicReported = useRef(false);
+  const noReceiptLogged = useRef(false);
+  useEffect(() => {
+    if (atomicRun.kind !== "queued") return;
+    const data = batchStatus.data;
+    if (data?.status === "failure") {
+      console.warn("SendTx: batch execution failed", data);
+      setAtomicRun({ kind: "error", message: "batch execution failed" });
+      return;
+    }
+    if (data?.status !== "success") return;
+    const receipt = data.receipts?.[data.receipts.length - 1];
+    if (!receipt) {
+      if (!noReceiptLogged.current) {
+        noReceiptLogged.current = true;
+        console.warn("SendTx: batch reported success with no receipt", data);
+      }
+      return;
+    }
+    if (!atomicReported.current) {
+      atomicReported.current = true;
+      reportDone(sid, {
+        kind: "tx",
+        hash: receipt.transactionHash,
+        venue,
+        chainId: chain.chainId,
+      });
+    }
+    setAtomicRun({
+      kind: "done",
+      id: atomicRun.id,
+      hash: receipt.transactionHash,
+    });
+  }, [atomicRun, batchStatus.data, sid, venue, chain.chainId]);
+
   const explorerTxUrl = (h: string) => `${chain.explorer}/tx/${h}`;
+  const atomicError = atomicRun.kind === "error" ? atomicRun.message : null;
 
   // Per-mode label/copy. The "value" for the input amount uses
   // tx.value when non-zero (native flows), else amountIn formatted with
@@ -337,10 +518,12 @@ export function SendTx({
       : `${fmt(amountIn, tokenIn.decimals)} ${tokenIn.symbol}`;
   const outputAmountLabel = `${fmt(amountOut, tokenOut.decimals)} ${tokenOut.symbol}`;
 
+  // Atomic mode ships approve + swap as one batch, so there is no "step 1".
+  const stepped = needsApprove && !atomic;
   const headers = (() => {
     if (mode === "wrap") {
       return {
-        title: needsApprove ? "step 2 — wrap" : "wrap",
+        title: stepped ? "step 2 — wrap" : "wrap",
         button: "wrap",
         confirmed: "Wrapped",
         topPay: "you wrap",
@@ -349,7 +532,7 @@ export function SendTx({
     }
     if (mode === "unwrap") {
       return {
-        title: needsApprove ? "step 2 — unwrap" : "unwrap",
+        title: stepped ? "step 2 — unwrap" : "unwrap",
         button: "unwrap",
         confirmed: "Unwrapped",
         topPay: "you unwrap",
@@ -358,7 +541,7 @@ export function SendTx({
     }
     if (mode === "send") {
       return {
-        title: needsApprove ? "step 2 — send" : "send",
+        title: stepped ? "step 2 — send" : "send",
         button: "send",
         confirmed: "Sent",
         topPay: "you send",
@@ -366,7 +549,7 @@ export function SendTx({
       };
     }
     return {
-      title: needsApprove ? "step 2 — swap" : "send swap",
+      title: stepped ? "step 2 — swap" : "send swap",
       button: "send",
       confirmed: "Swap confirmed",
       topPay: "you pay",
@@ -374,92 +557,106 @@ export function SendTx({
     };
   })();
 
+  // Execution summary — built once the swap is mined. Shows what actually
+  // moved (received parsed from Transfer logs, falling back to the quote),
+  // plus block number and the on-chain network fee.
+  //
+  // Receipt field shapes vary across wallets/chains: blockNumber / gasUsed /
+  // effectiveGasPrice can come back null or absent through an injected
+  // wallet's RPC, and viem's runtime value won't always match the (non-null)
+  // type. Guard EVERY field so a missing one drops only its row rather than
+  // crashing the whole render (was: `receipt.blockNumber.toString()` on a
+  // null blockNumber → "Cannot read properties of null (reading 'toString')").
+  function summaryFor(receipt: ReceiptFields | undefined): SummaryRow[] {
+    const rows: SummaryRow[] = [];
+    rows.push({
+      label: mode === "send" ? "Sent" : "Paid",
+      value: `− ${inputAmountLabel}`,
+      tone: "neg",
+    });
+    if (mode === "send") {
+      rows.push({ label: "To", value: shorten(recipient ?? tx.to) });
+    } else {
+      let got: bigint | null = null;
+      try {
+        const to = recipient ?? address ?? "";
+        got = receipt?.logs
+          ? receivedFromLogs(receipt.logs, tokenOut.address, to)
+          : null;
+      } catch (e) {
+        console.warn("SendTx: could not read the received amount from logs", e);
+        got = null;
+      }
+      rows.push({
+        label: "Received",
+        value:
+          got !== null
+            ? `+ ${fmt(got.toString(), tokenOut.decimals)} ${tokenOut.symbol}`
+            : `+ ${outputAmountLabel} (≈)`,
+        tone: "pos",
+      });
+    }
+    if (receipt?.blockNumber != null) {
+      try {
+        rows.push({ label: "Block", value: `#${receipt.blockNumber.toString()}` });
+      } catch {
+        // non-bigint blockNumber — drop the row.
+      }
+    }
+    if (receipt?.gasUsed != null && receipt?.effectiveGasPrice != null) {
+      try {
+        const fee = BigInt(receipt.gasUsed) * BigInt(receipt.effectiveGasPrice);
+        rows.push({
+          label: "Network fee",
+          value: `${fmt(fee.toString(), 18)} ${chain.nativeSymbol}`,
+          tone: "muted",
+        });
+      } catch {
+        // gasUsed / effectiveGasPrice not numeric — drop the fee row only.
+      }
+    }
+    return rows;
+  }
+
   // Interactive dApp: compact, auto-fired status (no duplicate details panel).
   if (compact) {
     const phase: ExecPhase =
-      step === "done" ? "done" : runError ? "error" : "working";
-    const text = approving
-      ? approveHook.isPending
-        ? `confirm ${tokenIn.symbol} approval in your wallet…`
-        : approveReceipt.isLoading
-          ? `approving ${tokenIn.symbol}…`
-          : `approve ${tokenIn.symbol} in your wallet…`
-      : swapHook.isPending
-        ? "confirm in your wallet…"
-        : swapReceipt.isLoading
-          ? "waiting for confirmation…"
-          : "opening your wallet…";
-    const onRetry = approving
-      ? () => {
-          autoApproveFired.current = false;
-          void clickApprove();
-        }
-      : () => {
-          autoSwapFired.current = false;
-          void clickSwap();
-        };
+      runStage === "done" ? "done" : runError ? "error" : "working";
+    const text = !executorResolved
+      ? "checking wallet capabilities…"
+      : atomic
+        ? atomicRun.kind === "sending"
+          ? "confirm the batch in your wallet…"
+          : atomicRun.kind === "queued"
+            ? `queued in your wallet · waiting for execution · ${shorten(atomicRun.id)}`
+            : "opening your wallet…"
+        : approving
+          ? approveHook.isPending
+            ? `confirm ${tokenIn.symbol} approval in your wallet…`
+            : approveReceipt.isLoading
+              ? `approving ${tokenIn.symbol}…`
+              : `approve ${tokenIn.symbol} in your wallet…`
+          : swapHook.isPending
+            ? "confirm in your wallet…"
+            : swapReceipt.isLoading
+              ? "waiting for confirmation…"
+              : "opening your wallet…";
+    const onRetry = atomic
+      ? retryAtomic
+      : approving
+        ? () => {
+            autoApproveFired.current = false;
+            void clickApprove();
+          }
+        : () => {
+            autoSwapFired.current = false;
+            void clickSwap();
+          };
 
-    // Execution summary — built once the swap is mined. Shows what actually
-    // moved (received parsed from Transfer logs, falling back to the quote),
-    // plus block number and the on-chain network fee.
-    //
-    // Receipt field shapes vary across wallets/chains: blockNumber / gasUsed /
-    // effectiveGasPrice can come back null or absent through an injected
-    // wallet's RPC, and viem's runtime value won't always match the (non-null)
-    // type. Guard EVERY field so a missing one drops only its row rather than
-    // crashing the whole render (was: `receipt.blockNumber.toString()` on a
-    // null blockNumber → "Cannot read properties of null (reading 'toString')").
-    let summary: SummaryRow[] | undefined;
-    if (step === "done") {
-      const receipt = swapReceipt.data;
-      const rows: SummaryRow[] = [];
-      rows.push({
-        label: mode === "send" ? "Sent" : "Paid",
-        value: `− ${inputAmountLabel}`,
-        tone: "neg",
-      });
-      if (mode === "send") {
-        rows.push({ label: "To", value: shorten(recipient ?? tx.to) });
-      } else {
-        let got: bigint | null = null;
-        try {
-          const to = recipient ?? address ?? "";
-          got = receipt?.logs
-            ? receivedFromLogs(receipt.logs, tokenOut.address, to)
-            : null;
-        } catch {
-          got = null;
-        }
-        rows.push({
-          label: "Received",
-          value:
-            got !== null
-              ? `+ ${fmt(got.toString(), tokenOut.decimals)} ${tokenOut.symbol}`
-              : `+ ${outputAmountLabel} (≈)`,
-          tone: "pos",
-        });
-      }
-      if (receipt?.blockNumber != null) {
-        try {
-          rows.push({ label: "Block", value: `#${receipt.blockNumber.toString()}` });
-        } catch {
-          // non-bigint blockNumber — drop the row.
-        }
-      }
-      if (receipt?.gasUsed != null && receipt?.effectiveGasPrice != null) {
-        try {
-          const fee = BigInt(receipt.gasUsed) * BigInt(receipt.effectiveGasPrice);
-          rows.push({
-            label: "Network fee",
-            value: `${fmt(fee.toString(), 18)} ${chain.nativeSymbol}`,
-            tone: "muted",
-          });
-        } catch {
-          // gasUsed / effectiveGasPrice not numeric — drop the fee row only.
-        }
-      }
-      summary = rows;
-    }
+    const summary =
+      runStage === "done"
+        ? summaryFor(atomic ? batchReceipt : swapReceipt.data)
+        : undefined;
 
     // wrongChainName: suppressed while chainErr is set — that message already
     // spells out "switch to <chain> and retry", no need to stack both.
@@ -469,7 +666,16 @@ export function SendTx({
         text={text}
         doneText={headers.confirmed}
         error={runError}
-        txHash={swapHook.data ?? approveHook.data ?? null}
+        txHash={
+          atomic
+            ? atomicRun.kind === "done"
+              ? atomicRun.hash
+              : null
+            : (swapHook.data ?? approveHook.data ?? null)
+        }
+        // A batch id is not a tx hash, so no explorer link until the batch
+        // executes and hands us the real one.
+        href={atomic && atomicRun.kind === "queued" ? null : undefined}
         explorer={chain.explorer}
         onRetry={onRetry}
         wrongChainName={wrongChain && !chainErr ? chain.name : null}
@@ -551,7 +757,7 @@ export function SendTx({
       )}
       {chainErr && <p className="err">{chainErr}</p>}
 
-      {needsApprove && (
+      {stepped && (
         <div className="panel">
           <h2 style={{ fontSize: 14, margin: "0 0 8px" }}>
             step 1 — approve {tokenIn.symbol}
@@ -562,8 +768,8 @@ export function SendTx({
           </div>
           <button
             disabled={
-              !address || step !== "approve" || approveHook.isPending ||
-              approveReceipt.isLoading
+              !address || !executorResolved || step !== "approve" ||
+              approveHook.isPending || approveReceipt.isLoading
             }
             onClick={clickApprove}
           >
@@ -632,62 +838,128 @@ export function SendTx({
 
       <div className="panel">
         <h2 style={{ fontSize: 14, margin: "0 0 8px" }}>{headers.title}</h2>
-        <button
-          disabled={
-            !address ||
-            step === "approve" ||
-            step === "done" ||
-            swapHook.isPending ||
-            swapReceipt.isLoading
-          }
-          onClick={clickSwap}
-        >
-          {step === "done"
-            ? headers.confirmed
-            : swapHook.isPending
-              ? "confirm in wallet…"
-              : swapReceipt.isLoading
-                ? (
-                    <>
-                      <ButtonSpinner />
-                      waiting for confirmation…
-                    </>
-                  )
-                : headers.button}
-        </button>
-        {swapHook.data && (
-          <div className="muted" style={{ marginTop: 8 }}>
-            <a
-              href={explorerTxUrl(swapHook.data)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {swapHook.data}
-            </a>
-          </div>
-        )}
-        {(swapHook.error ?? swapReceipt.error) && (
-          <div className="err" style={{ marginTop: 8 }}>
-            {(swapHook.error ?? swapReceipt.error)!.message}
+        {atomic ? (
+          <>
             <button
-              style={{ marginLeft: 12 }}
-              onClick={() =>
-                reportDone(sid, {
-                  kind: "error",
-                  error: (swapHook.error ?? swapReceipt.error)!.message,
-                  venue,
-                  chainId: chain.chainId,
-                })
+              disabled={
+                !address ||
+                atomicRun.kind === "sending" ||
+                atomicRun.kind === "queued" ||
+                atomicRun.kind === "done"
               }
+              onClick={clickAtomic}
             >
-              report &amp; close
+              {atomicRun.kind === "done"
+                ? headers.confirmed
+                : atomicRun.kind === "sending"
+                  ? "confirm in wallet…"
+                  : atomicRun.kind === "queued"
+                    ? (
+                        <>
+                          <ButtonSpinner />
+                          queued — waiting for execution…
+                        </>
+                      )
+                    : needsApprove
+                      ? "Send approve + swap as one batch"
+                      : "Send"}
             </button>
-          </div>
-        )}
-        {step === "done" && (
-          <p className="ok" style={{ marginTop: 12 }}>
-            Reported back to the CLI — you can close this tab.
-          </p>
+            {atomicRun.kind === "done" && (
+              <>
+                <div className="muted" style={{ marginTop: 8 }}>
+                  <a
+                    href={explorerTxUrl(atomicRun.hash)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {atomicRun.hash}
+                  </a>
+                </div>
+                <p className="ok" style={{ marginTop: 12 }}>
+                  Reported back to the CLI — you can close this tab.
+                </p>
+              </>
+            )}
+            {atomicError && (
+              <div className="err" style={{ marginTop: 8 }}>
+                {atomicError}
+                <button
+                  style={{ marginLeft: 12 }}
+                  onClick={() =>
+                    reportDone(sid, {
+                      kind: "error",
+                      error: atomicError,
+                      venue,
+                      chainId: chain.chainId,
+                    })
+                  }
+                >
+                  report &amp; close
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <button
+              disabled={
+                !address ||
+                !executorResolved ||
+                step === "approve" ||
+                step === "done" ||
+                swapHook.isPending ||
+                swapReceipt.isLoading
+              }
+              onClick={clickSwap}
+            >
+              {step === "done"
+                ? headers.confirmed
+                : swapHook.isPending
+                  ? "confirm in wallet…"
+                  : swapReceipt.isLoading
+                    ? (
+                        <>
+                          <ButtonSpinner />
+                          waiting for confirmation…
+                        </>
+                      )
+                    : headers.button}
+            </button>
+            {swapHook.data && (
+              <div className="muted" style={{ marginTop: 8 }}>
+                <a
+                  href={explorerTxUrl(swapHook.data)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {swapHook.data}
+                </a>
+              </div>
+            )}
+            {(swapHook.error ?? swapReceipt.error) && (
+              <div className="err" style={{ marginTop: 8 }}>
+                {(swapHook.error ?? swapReceipt.error)!.message}
+                <button
+                  style={{ marginLeft: 12 }}
+                  onClick={() =>
+                    reportDone(sid, {
+                      kind: "error",
+                      error: (swapHook.error ?? swapReceipt.error)!.message,
+                      venue,
+                      chainId: chain.chainId,
+                    })
+                  }
+                >
+                  report &amp; close
+                </button>
+              </div>
+            )}
+            {step === "done" && (
+              <p className="ok" style={{ marginTop: 12 }}>
+                Reported back to the CLI — you can close this tab.
+              </p>
+            )}
+          </>
         )}
       </div>
     </div>
