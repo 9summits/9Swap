@@ -88,6 +88,23 @@ The edge layer can't be configured in code — set it up on the project:
 - Consider IP allowlisting if this is an internal tool.
 - Rotate any key that gets abused; revoke the Vercel env var and redeploy.
 
+## Framing headers (Safe App)
+
+The catch-all header rule in `vercel.json` used to send `X-Frame-Options: DENY`
+alongside `Content-Security-Policy: frame-ancestors 'none'`. Running as a Safe
+App means being framed by `https://app.safe.global`, so the CSP directive now
+reads `frame-ancestors 'self' https://app.safe.global` and `X-Frame-Options` is
+gone entirely rather than relaxed. There is no form of that header a current
+browser honours with an origin allowlist (`ALLOW-FROM` was dropped by every
+engine), so keeping it at `DENY` would have overridden the CSP in the browsers
+that still read it, and keeping it at all would have added nothing the CSP does
+not already say. `frame-ancestors` is the allowlist, and it is strictly narrower
+than the old pair was for every origin except `app.safe.global`.
+
+`/manifest.json` gets its own rule with `Access-Control-Allow-Origin: *`, plus an
+explicit JSON content type and a one-hour cache. The Safe web app fetches it
+cross-origin, before it mounts the iframe, to read the app's name and icon.
+
 ## CLI one-shot install
 
 The dApp deployment hosts the CLI installer at a stable path:

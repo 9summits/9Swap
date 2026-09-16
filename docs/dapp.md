@@ -275,6 +275,140 @@ A small SVG (terminal `>` + ETH diamond) inlined as a base64 data URI in
 `web/index.html`. Files in `web/public/` would copy as separate assets and break
 the single-file embed.
 
+## Safe App and atomic batching
+
+The dApp runs as a Safe App inside the `app.safe.global` iframe, and any account
+whose wallet reports EIP-5792 atomic batching executes approve + swap as a single
+`wallet_sendCalls` batch instead of two sequential wallet prompts.
+
+### Hosting requirements
+
+Two things in `vercel.json` make the iframe load at all, and both are header
+rules, not app code:
+
+- `Content-Security-Policy: frame-ancestors 'self' https://app.safe.global` on
+  the catch-all rule, replacing the previous `frame-ancestors 'none'`. The
+  `X-Frame-Options: DENY` header that sat next to it is gone: its `ALLOW-FROM`
+  origin-allowlist form is no longer honoured by any current browser, so CSP
+  carries the allowlist alone.
+- `Access-Control-Allow-Origin: *` on `/manifest.json`, which the Safe web app
+  fetches cross-origin before it mounts the iframe. `web/public/manifest.json`
+  carries `name` / `description` / `iconPath` and Vite copies it into
+  `dist-vercel/`.
+
+### The safe connector
+
+`web/src/wagmi.ts` adds a Safe entry to the RainbowKit list, after `rabbyWallet`.
+It is RainbowKit's `safeWallet()` with one override: the connector is built from
+`safe({ allowedDomains: [/^https:\/\/app\.safe\.global$/], unstable_getInfoTimeout: 3000 })`
+instead of `safe()`'s defaults, whose `unstable_getInfoTimeout` is **10 ms**. That
+default loses the first `sdk.safe.getInfo()` round trip through the frame on load
+and the connector then reports "not a Safe App". Everything else is inherited,
+including `getProvider()`'s `window.parent !== window` self-check, so the entry
+never surfaces outside a Safe iframe. `@safe-global/safe-apps-sdk` and
+`@safe-global/safe-apps-provider` are lazy-imported by the connector and are
+already resolvable as transitive deps; neither is a direct dependency.
+
+`InteractiveDapp` auto-connects it. Once wagmi's `useAccount().status` reaches
+`"disconnected"` (reconnect finished and found nothing) and the page is framed,
+it calls `connect()` on the connector with `id === "safe"`, guarded by a ref so it
+runs once. wagmi's own `reconnect()` is not enough here: the safe connector's
+`isAuthorized()` wraps `getAccounts()` in a bare `catch` that swallows the
+`getInfo` timeout and answers `false`, so a first load inside the Safe would
+otherwise sit disconnected.
+
+The Safe picks the network, so the chain selector follows it rather than driving
+it. When `connector?.id === "safe"` and the wallet chain differs from the form's,
+`setChain` moves to the matching entry of the mode's chain list (the existing
+`chain.alias` effect syncs the URL, no extra work). The selector renders as a
+static chip with `title="Chain is set by the Safe"` and no dropdown. **Edge case:**
+if the Safe's chain is absent from the list, nothing moves and the selector stays
+locked on the current chain, so the wallet-chain mismatch surfaces at execution
+time as the usual "switch to `<chain>`" error.
+
+The wallet-mismatch guard in `ExecutionLeg` is unchanged. The Safe address is the
+connected account and `/api/build` receives it as `sender`, so `payload.sender`
+and the connected address agree.
+
+### Choosing the executor
+
+`web/src/atomicBatch.ts` owns the decision, once per (account, chain):
+
+```ts
+export type Executor = "sequential" | "atomic";
+export function useExecutor(chainId: number): { executor: Executor; resolved: boolean };
+```
+
+It wraps `useCapabilities({ account, chainId, query: { retry: false, staleTime:
+Infinity } })`. `executor` is `"atomic"` only when `data.atomic.status ===
+"supported"` or the pre-final spelling `data.atomicBatch.supported === true`.
+Everything else falls to `"sequential"`: `'unsupported'`, an error, a wallet with
+no such method, and specifically `'ready'`, which is what MetaMask EOAs answer
+and which would prompt an EIP-7702 account upgrade the user never asked for.
+Wallets without the method reject the request, which is expected rather than a
+fault, so it is logged once per hook instance with `console.info`.
+
+This is not only a UX nicety. `eth_sendTransaction` through a Safe (over the
+iframe provider or over WalletConnect) returns a **safeTxHash**, not an on-chain
+tx hash, so `useTxReceipt`'s public-RPC poll never resolves and the sequential
+path hangs forever. The atomic executor is therefore used whenever capabilities
+say `supported`, including when no approval is needed and the batch holds a
+single call.
+
+Nothing fires until `resolved`. The compact status reads `checking wallet
+capabilities…` in the meantime, and the `--browser` panel's buttons are disabled,
+because picking an executor before the probe settles would take the sequential
+path on a Safe.
+
+### The `queued` stage
+
+`SendTxRun.stage` gains `"queued"`: the wallet accepted the batch and we hold its
+id, but no execution has been observed on-chain. Through a Safe that can last
+hours while the remaining owners confirm. The atomic run is a discriminated
+union (`idle` → `sending` → `queued` → `done` | `error`) carrying the id only in
+the states that have one.
+
+- Calls are `[approveTx, tx]`, or just `[tx]` when `approval.needed` is false.
+  The approve target is `approveTx.to`, never `tx.to`.
+- `sendCallsAsync({ calls, chainId, forceAtomic: true })` after `ensureChain()`.
+  viem's `experimental_fallback` stays off: it would silently degrade to
+  sequential `eth_sendTransaction` under a synthetic id, and we only reach this
+  path because the wallet already said batching is supported.
+- `useCallsStatus` polls every 4 s until terminal. A Safe that has only just been
+  proposed is not yet indexed and the call throws, so the poll retries and only a
+  returned `status === "failure"` becomes a run error. Poll failures leave a
+  single `console.info` breadcrumb.
+- On `status === "success"` the **last** receipt is the swap (a Safe repeats one
+  receipt per call). Its `transactionHash` is the hash, `logs` feed the received
+  amount, and the explorer link finally appears. EIP-5792 call receipts carry no
+  `effectiveGasPrice`, so the summary's network-fee row simply does not render.
+
+`queued` does not keep the parent busy. The action button reads `Batch queued ·
+waiting for execution` and stays enabled, `shouldHoldQuotes` treats it like a
+terminal stage so quotes keep refreshing (freezing them for hours is worse than
+letting them move), and the balance refetch still fires on `"done"` only. The
+exec panel keeps polling while mounted; starting a new swap unmounts it, which is
+fine because the batch is already queued with the wallet.
+
+`POST /done` receives the same `{kind:"tx", hash, venue, chainId}` body as the
+sequential path, once, at `"done"`. It is the real on-chain hash from the batch
+receipt, never the batch id, so venue/chain accounting from server logs is
+unaffected. A batch that is still queued reports nothing.
+
+`--browser` is covered for free: the whole change lives in `SendTx`, which both
+surfaces render. The non-compact panel swaps the approve/swap button pair for one
+`Send approve + swap as one batch` button and drops the "step 1" panel, keeping
+the slippage and spender rows.
+
+### Not batch-aware
+
+Async venues (`SignOrder`) and the Uniswap Permit2 path (`SignPermitTx`) still
+run their legs sequentially, and a Safe cannot use either: both need an EOA
+signature (`useSignTypedData` over an order or a `PermitSingle`), which a Safe
+produces as EIP-1271 rather than ECDSA. Their approve leg would hit the same
+safeTxHash problem. Making them Safe-capable means EIP-1271 order signing per
+venue, not a batch.
+
 ## Vercel target
 
 The same dApp deploys to a serverless target (Vercel) as a static front + one

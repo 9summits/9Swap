@@ -80,4 +80,7 @@ web/                 Vite + React + RainbowKit dApp (separate package)
   builds always re-quote with the real sender.
 - **Async venues (cow/delta/uniswapx/fusion) require `--allow-async`** — they
   change output semantics (sign + POST vs. broadcast a tx).
+- **Smart accounts (Safe) return a batch/safeTxHash id, not a tx hash.** Any
+  account whose wallet reports EIP-5792 atomic `supported` executes through
+  `wallet_sendCalls` + `wallet_getCallsStatus`, never through `useTxReceipt`.
 - **Commit messages carry no `Co-Authored-By: Claude` trailer.**
