@@ -21,7 +21,9 @@ export type ChainMeta = {
   name: string;
   explorer: string;
   nativeSymbol: string;
-  wrappedNative: string;
+  // null on chains with no WETH9-style wrapper (Arc) — the wrap/unwrap form
+  // mode is then unreachable and every pair is a real swap.
+  wrappedNative: string | null;
 };
 
 // One venue the backend can route through. `kind` distinguishes sync (broadcast

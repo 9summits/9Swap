@@ -74,8 +74,19 @@ const V2_ROUTER: Record<number, string> = {
 // 137 (Polygon) and 57073 (Ink) are Path A only: both have Uniswap v2/v3/v4
 // deployed, but we have not verified official SwapRouter02 / V2Router02
 // addresses for these chains in this repo, so builds go through /v1/swap.
+// 5042 (Arc) is Path A only: every route we saw is a Uniswap v4 pool, which
+// has no SwapRouter02 / V2Router02 to hand-roll against anyway.
+// Arc quote accuracy, observed 2026-09-16: for ~15 minutes the Trading API
+// quoted USDC→EURC through a DRAINED v4 pool (fee 375 / tickSpacing 4, id
+// 0xc6e1605e…0f30) at the market rate; the built tx then reverts with
+// V4TooLittleReceived — the min-out guard holds, so only gas is lost, never
+// funds. Later quotes moved to a V3 0.05% pool / the v4 0.05% pool and
+// execute fine. KyberSwap routes the same v4 liquidity with on-chain-accurate
+// quotes, so the divergence is the Trading API's routing state, not the pool
+// data. Venue kept (it wins plenty of Arc routes); `--simulate` is the safety
+// net on this chain — it catches the stale-pool quote before broadcast.
 const SUPPORTED_CHAIN_IDS = new Set([
-  1, 10, 42161, 8453, 56, 130, 137, 143, 43114, 4663, 57073,
+  1, 10, 42161, 8453, 56, 130, 137, 143, 43114, 4663, 57073, 5042,
 ]);
 
 const SEL_EXACT_INPUT_SINGLE = "0x04e45aaf"; // exactInputSingle((address,address,uint24,address,uint256,uint256,uint160))

@@ -416,7 +416,8 @@ const { markdown, source } = await loadDocs();
 const docs = parseDocs(markdown);
 console.error(`docs: ${docs.length} rows from ${source} (WETH+USDG + stocks)`);
 
-const wrapped = CHAINS.robinhood.wrappedNative.toLowerCase();
+// wrappedNative is nullable chain-wide (Arc has no wrapper); Robinhood does.
+const wrapped = CHAINS.robinhood.wrappedNative?.toLowerCase() ?? null;
 if (wrapped !== WETH_LC) fail("CHAINS.robinhood.wrappedNative does not match official WETH");
 
 const rpc = await pickRpc();

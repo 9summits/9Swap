@@ -55,6 +55,10 @@ import {
   suppressedSiblings,
 } from "./format.ts";
 import { simulateSwap, type SimulateResult } from "./simulate.ts";
+// core.ts is the commander-free mirror of this file's orchestration; only the
+// small pure predicate is borrowed here so the CLI and the dApp agree on when
+// an approval is pointless. (core.ts never imports index.ts — no cycle.)
+import { inputPaidViaValue } from "./core.ts";
 import { getReferralConfig, setNoFeeMode, setReferralMode } from "./referral.ts";
 import { setOdosV2NoCompact, setOdosV2DisableRfqs } from "./venues/odosv2.ts";
 import { setOdosDisableRfqs } from "./venues/odos.ts";
@@ -506,7 +510,7 @@ async function main(): Promise<void> {
       "--to <addr>",
       "recipient address — required with `-a send`",
     )
-    .option("-c, --chain <chain>", "chain alias (eth, arb, base, op, avax, bsc, hype, unichain, robinhood, monad, plasma, polygon, gnosis, ink)", "eth")
+    .option("-c, --chain <chain>", "chain alias (eth, arc, arb, base, op, avax, bsc, hype, unichain, robinhood, monad, plasma, polygon, gnosis, ink)", "eth")
     .option<VenueArg>(
       "-v, --venue <venue>",
       `aggregator to query (${VENUE_OPTIONS.join(" | ")}) — comma-separated list also accepted, e.g. "kyber,odos,matcha"`,
@@ -1474,6 +1478,19 @@ async function main(): Promise<void> {
           const prioPromise = rpc ? getPriorityFee(rpc) : Promise.resolve(null);
 
           const isNativeIn = tokenIn.address.toLowerCase() === NATIVE_SENTINEL;
+          // Same treatment as native input for a build that pays its ERC20
+          // input through msg.value — the case on chains whose gas token IS
+          // an ERC20 (Arc's USDC, Uniswap's v4 route). No allowance read, no
+          // approve tx: the router is funded by the value, never by a pull.
+          // Fail-safe direction: were a future build to set a value AND pull
+          // via Permit2, the missing approval reverts the tx (gas lost, no
+          // over-spend), whereas a needless approval leaves standing
+          // spend authority behind.
+          const paidViaValue = inputPaidViaValue(
+            chain,
+            tokenIn.address,
+            tx ? { kind: "tx", value: tx.value } : (order ?? permitTx),
+          );
           // Skip the allowance read entirely for wrap or send modes —
           // neither needs an ERC20 approval (deposit pulls via
           // msg.value; withdraw burns msg.sender's own WETH; transfer
@@ -1490,7 +1507,7 @@ async function main(): Promise<void> {
               };
               approveTx = remoteApproval.approveTx ?? null;
             }
-          } else if (!isNativeIn && !wrapMode && !isSend && !isUnwrapWrseth && !isWithdrawSparkWeth && !isUnstakeSavax && !isClaimSavax) {
+          } else if (!isNativeIn && !paidViaValue && !wrapMode && !isSend && !isUnwrapWrseth && !isWithdrawSparkWeth && !isUnstakeSavax && !isClaimSavax) {
             if (!rpc) {
               console.error(
                 pc.yellow("!") +
@@ -1614,6 +1631,14 @@ async function main(): Promise<void> {
               spender,
               swapTx: swapTxPayload,
               watches: watches.length > 0 ? watches : undefined,
+              // Arc: the input token IS the gas token, backed by the native
+              // balance with no balances slot to probe. Pass its ERC20
+              // decimals so the override scales to the 18-decimal EVM view.
+              nativeErc20:
+                chain.nativeErc20 &&
+                tokenIn.address.toLowerCase() === chain.nativeErc20.toLowerCase()
+                  ? { address: chain.nativeErc20, decimals: tokenIn.decimals }
+                  : null,
             }).then((r): SimulationOutcome => {
               if ("ok" in r) {
                 // Append a 1inch-specific hint when the swap reverts —
@@ -2000,6 +2025,14 @@ async function main(): Promise<void> {
                     tokenOut: tokenOut.address,
                     spender: tx!.spender,
                     swapTx: { to: tx!.to, data: tx!.data, value: tx!.value },
+                    // See the --simulate call site above: on Arc the input
+                    // token is the gas token (no balances slot), funded via
+                    // the sender's native balance at 10^(18-decimals).
+                    nativeErc20:
+                      chain.nativeErc20 &&
+                      tokenIn.address.toLowerCase() === chain.nativeErc20.toLowerCase()
+                        ? { address: chain.nativeErc20, decimals: tokenIn.decimals }
+                        : null,
                   }),
                   fetchTokenPriceUsd(chain, tokenIn.address),
                   fetchTokenPriceUsd(chain, tokenOut.address),

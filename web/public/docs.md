@@ -37,7 +37,7 @@ swap [options] <amount> <tokenIn> [tokenOut]
 | Flag | Effect |
 |------|--------|
 | `-v, --venue <list>` | One venue, a comma list (`kyber,matcha,1inch`), or `all` (default). `--all` = `-v all`. |
-| `-c, --chain <alias>` | `eth` (default), `base`, `arb`, `op`, `avax`, `bsc`, `hype`, `unichain`, `robinhood`, `monad`, `plasma`, `polygon`, `gnosis`, `ink`. |
+| `-c, --chain <alias>` | `eth` (default), `arc`, `base`, `arb`, `op`, `avax`, `bsc`, `hype`, `unichain`, `robinhood`, `monad`, `plasma`, `polygon`, `gnosis`, `ink`. |
 | `--slippage <pct>` | Percent; `0.5` = 50 bps. Default `0.1`. Same value drives quote and build. |
 | `--from <addr\|alias>` | Sender and recipient. Required for `-d`, `--simulate`, `--browser`, `max`. Falls back to `$SENDER_ADDRESS`. Accepts a wallet alias. |
 | `-d, --data` | Build the tx: target, calldata, value, gas params, allowance check, approve tx when needed. |
@@ -169,25 +169,26 @@ Sync venues return a broadcastable tx. Intent venues return an EIP-712 order you
 
 Under `-v all` the CLI only races the venues that serve the selected chain; the others are skipped silently. Async venues still need `--allow-async`; `curve` needs an RPC. ✓ served, · not served. Snapshot of the adapters' chain tables; the live set for a deployment is `GET /api/mode`.
 
-| Venue | eth | base | arb | op | unichain | bsc | avax | hype | robinhood | monad | plasma | polygon | gnosis | ink |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| `kyber` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | · |
-| `velora` (sync) | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | · | · | · | ✓ | ✓ | · |
-| `matcha` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | ✓ | ✓ | · | ✓ |
-| `1inch` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · |
-| `curve` (sync) | ✓ | ✓ | ✓ | ✓ | · | · | ✓ | · | · | · | · | · | ✓ | · |
-| `uniswap` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | ✓ | · | ✓ |
-| `openocean` (sync) | ✓ | ✓ | ✓ | · | · | ✓ | ✓ | · | ✓ | · | · | ✓ | ✓ | · |
-| `cow` (intent) | ✓ | ✓ | ✓ | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
-| `ophis` (intent) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | · | ✓ | ✓ | ✓ | ✓ |
-| `delta` (intent) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | · | · | ✓ | · | · |
-| `uniswapx` (intent) | ✓ | ✓ | ✓ | · | ✓ | · | · | · | · | · | · | · | · | · |
-| `fusion` (intent) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | ✓ | ✓ | · |
-| *venues per chain* | 12 | 12 | 12 | 9 | 8 | 9 | 10 | 2 | 7 | 5 | 3 | 10 | 7 | 4 |
+| Venue | eth | arc | base | arb | op | unichain | bsc | avax | hype | robinhood | monad | plasma | polygon | gnosis | ink |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| `kyber` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | · |
+| `velora` (sync) | ✓ | · | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | · | · | · | ✓ | ✓ | · |
+| `matcha` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | ✓ | ✓ | · | ✓ |
+| `1inch` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · |
+| `curve` (sync) | ✓ | · | ✓ | ✓ | ✓ | · | · | ✓ | · | · | · | · | · | ✓ | · |
+| `uniswap` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | ✓ | · | ✓ |
+| `openocean` (sync) | ✓ | ✓ | ✓ | ✓ | · | · | ✓ | ✓ | · | ✓ | · | · | ✓ | ✓ | · |
+| `cow` (intent) | ✓ | · | ✓ | ✓ | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+| `ophis` (intent) | ✓ | · | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | · | ✓ | ✓ | ✓ | ✓ |
+| `delta` (intent) | ✓ | · | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | · | · | ✓ | · | · |
+| `uniswapx` (intent) | ✓ | · | ✓ | ✓ | · | ✓ | · | · | · | · | · | · | · | · | · |
+| `fusion` (intent) | ✓ | · | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | ✓ | ✓ | · |
+| *venues per chain* | 12 | 5 | 12 | 12 | 9 | 8 | 9 | 10 | 2 | 7 | 5 | 3 | 10 | 7 | 4 |
 
 | Alias | Chain | Native |
 |-------|-------|--------|
 | `eth` | Ethereum (default) | ETH |
+| `arc` | Arc | USDC |
 | `base` | Base | ETH |
 | `arb` | Arbitrum One | ETH |
 | `op` | Optimism | ETH |

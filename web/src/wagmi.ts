@@ -54,6 +54,20 @@ const robinhood = defineChain({
   },
 });
 
+// Arc (id 5042) — viem 2.55 ships only `arcTestnet`, so define mainnet
+// locally. The gas token is USDC and, at the EVM level (msg.value, balances,
+// gas), it carries 18 decimals — the 6-decimal view is the ERC20 interface at
+// 0x3600…0000, which is what the token list and calldata use.
+const arc = defineChain({
+  id: 5042,
+  name: "Arc",
+  nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
+  rpcUrls: { default: { http: ["https://rpc.mainnet.arc.io"] } },
+  blockExplorers: {
+    default: { name: "Arc Explorer", url: "https://explorer.arc.io" },
+  },
+});
+
 // Build a wagmi config matching the chain the CLI handed us. RainbowKit's
 // own helpers want a list, so we include the major chains and use the
 // payload's chainId to scope the page; the user can switch network in
@@ -71,6 +85,7 @@ const PLACEHOLDER_PROJECT_ID = "00000000000000000000000000000000";
 // balance reads) for chains the wallet isn't currently on.
 export const knownChains: readonly [Chain, ...Chain[]] = [
   mainnet,
+  arc,
   base,
   robinhood,
   hyperEvm,
@@ -223,6 +238,7 @@ export function buildWagmiConfig(args: {
     multiInjectedProviderDiscovery: !framed,
     transports: {
       [mainnet.id]: transportFor(mainnet.id),
+      [arc.id]: transportFor(arc.id),
       [arbitrum.id]: transportFor(arbitrum.id),
       [base.id]: transportFor(base.id),
       [optimism.id]: transportFor(optimism.id),

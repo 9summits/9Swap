@@ -51,6 +51,7 @@ import {
   quoteSingle,
   buildForVenue,
   checkAllowance,
+  inputPaidViaValue,
   needsAllowanceCheck,
   assemble as coreAssemble,
   resolveRouteHops,
@@ -965,9 +966,15 @@ export async function handleBuild(req: Request, opts?: { sid?: string }): Promis
     });
 
     // Allowance — applies to sync tx AND async order (orders pull the sell
-    // token via the protocol's relayer). Skipped for native / wrap / send.
+    // token via the protocol's relayer). Skipped for native / wrap / send,
+    // and for a build that pays its ERC20 input through msg.value (Arc's
+    // native USDC): `approval = null` is the shape the page already handles
+    // for native input, so no extra approve step is surfaced.
     let approval: ApprovalForBrowser | null = null;
-    if (needsAllowanceCheck(tokenIn, b.venue, chain)) {
+    if (
+      needsAllowanceCheck(tokenIn, b.venue, chain) &&
+      !inputPaidViaValue(chain, tokenIn.address, result)
+    ) {
       const a = await checkAllowance({
         chain,
         tokenIn,

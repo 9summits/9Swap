@@ -50,6 +50,7 @@ Aliases (CLI `--chain` / API `chain` field):
 | Alias | Network | Native |
 |-------|---------|--------|
 | `eth` | Ethereum mainnet | ETH |
+| `arc` | Arc | USDC |
 | `arb` | Arbitrum One | ETH |
 | `base` | Base | ETH |
 | `op` | Optimism | ETH |
@@ -64,7 +65,7 @@ Aliases (CLI `--chain` / API `chain` field):
 | `gnosis` | Gnosis | XDAI |
 | `ink` | Ink | ETH |
 
-Native token is represented internally as the sentinel address `0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee` (adapters translate at venue boundaries). Token symbols or `0x` addresses are accepted; decimals must be resolved correctly (never assumed to be 18).
+Native token is represented internally as the sentinel address `0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee` (adapters translate at venue boundaries). Arc is the exception: its gas token is USDC, reachable only as the ERC-20 at `0x3600000000000000000000000000000000000000` (6 decimals), and the sentinel is rejected there. Token symbols or `0x` addresses are accepted; decimals must be resolved correctly (never assumed to be 18).
 
 ## Venues
 
@@ -76,21 +77,21 @@ Native token is represented internally as the sentinel address `0xeeeeeeeeeeeeee
 
 **Availability by chain** (✓ served, · not; snapshot of the CLI adapters, live set per deployment in `GET /api/mode`):
 
-| Venue | eth | base | arb | op | unichain | bsc | avax | hype | robinhood | monad | plasma | polygon | gnosis | ink |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| `kyber` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | · |
-| `velora` (sync) | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | · | · | · | ✓ | ✓ | · |
-| `matcha` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | ✓ | ✓ | · | ✓ |
-| `1inch` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · |
-| `curve` (sync) | ✓ | ✓ | ✓ | ✓ | · | · | ✓ | · | · | · | · | · | ✓ | · |
-| `uniswap` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | ✓ | · | ✓ |
-| `openocean` (sync) | ✓ | ✓ | ✓ | · | · | ✓ | ✓ | · | ✓ | · | · | ✓ | ✓ | · |
-| `cow` (intent) | ✓ | ✓ | ✓ | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
-| `ophis` (intent) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | · | ✓ | ✓ | ✓ | ✓ |
-| `delta` (intent) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | · | · | ✓ | · | · |
-| `uniswapx` (intent) | ✓ | ✓ | ✓ | · | ✓ | · | · | · | · | · | · | · | · | · |
-| `fusion` (intent) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | ✓ | ✓ | · |
-| *venues per chain* | 12 | 12 | 12 | 9 | 8 | 9 | 10 | 2 | 7 | 5 | 3 | 10 | 7 | 4 |
+| Venue | eth | arc | base | arb | op | unichain | bsc | avax | hype | robinhood | monad | plasma | polygon | gnosis | ink |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| `kyber` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | · |
+| `velora` (sync) | ✓ | · | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | · | · | · | ✓ | ✓ | · |
+| `matcha` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | ✓ | ✓ | · | ✓ |
+| `1inch` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · |
+| `curve` (sync) | ✓ | · | ✓ | ✓ | ✓ | · | · | ✓ | · | · | · | · | · | ✓ | · |
+| `uniswap` (sync) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | ✓ | · | ✓ |
+| `openocean` (sync) | ✓ | ✓ | ✓ | ✓ | · | · | ✓ | ✓ | · | ✓ | · | · | ✓ | ✓ | · |
+| `cow` (intent) | ✓ | · | ✓ | ✓ | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+| `ophis` (intent) | ✓ | · | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | · | ✓ | ✓ | ✓ | ✓ |
+| `delta` (intent) | ✓ | · | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | · | · | ✓ | · | · |
+| `uniswapx` (intent) | ✓ | · | ✓ | ✓ | · | ✓ | · | · | · | · | · | · | · | · | · |
+| `fusion` (intent) | ✓ | · | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | ✓ | ✓ | · |
+| *venues per chain* | 12 | 5 | 12 | 12 | 9 | 8 | 9 | 10 | 2 | 7 | 5 | 3 | 10 | 7 | 4 |
 
 Venue availability depends on server env keys (e.g. `ZEROEX_API_KEY`, `ONEINCH_API_KEY`, `UNISWAP_API_KEY`; optional `KYBER_API_KEY` moves kyber to its higher-limit API gateway; optional `OPENOCEAN_API_KEY` moves openocean to its pro host) and `SWAP_DISABLE_VENUES` (production often disables `curve` because cold init is slow on serverless).
 

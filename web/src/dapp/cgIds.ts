@@ -743,6 +743,18 @@ export const CG_IDS: Record<number, CgChainIds> = {
       "0xffaa4a3d97fe9107cef8a3f48c069f577ff76cc1": "staked-hype",
     },
   },
+  // arc (arc) — 3 tokens. Hand-added (Arc postdates the generated dump):
+  // USDC and EURC contracts confirmed on CoinGecko's `arc` platform, and the
+  // native asset IS that USDC (Arc pays gas in it). WETH here is bridged ETH,
+  // priced off the `weth` id.
+  5042: {
+    native: "usd-coin",
+    byAddr: {
+      "0x3600000000000000000000000000000000000000": "usd-coin",
+      "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1": "euro-coin",
+      "0x128cc466b61f542da60c70e3aa11c10e19b84edb": "weth",
+    },
+  },
   // robinhood (robinhood) — 66 tokens
   4663: {
     native: "ethereum",
@@ -1280,4 +1292,5 @@ export const CG_PLATFORM: Record<number, string> = {
   42161: "arbitrum-one", // arb
   43114: "avalanche", // avax
   57073: "ink", // ink
+  5042: "arc", // arc
 };

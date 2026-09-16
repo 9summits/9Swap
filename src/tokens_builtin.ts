@@ -6,6 +6,10 @@
 //     list (/api/tokens) would be native-only.
 //   - Gnosis (100): KyberSwap ks-setting returns 0 tokens.
 //   - Ink (57073): KyberSwap ks-setting returns 0 tokens.
+//   - Arc (5042): ks-setting DOES index Arc, but its whitelist is mostly
+//     memecoins and omits the majors (USYC, cirBTC) — and the chain's gas
+//     token (USDC) needs a trusted 6-decimals entry, since Arc has no
+//     sentinel-native row and at least one venue reports it as 18.
 // This table is the canonical source for those tokens — consulted FIRST by
 // src/tokens.ts (before the network resolvers) and merged into core.ts's
 // tokenList.
@@ -276,11 +280,26 @@ const INK_57073: BuiltinToken[] = [
   { address: "0xA3D68b74bF0528fdD07263c60d6488749044914b", symbol: "weETH", decimals: 18, name: "Wrapped eETH", logoURI: "https://assets.coingecko.com/coins/images/33033/small/weETH.png?1701438396" },
 ];
 
+// Arc (5042). USDC FIRST and deliberately so: it is the chain's gas token
+// (chains.ts `nativeErc20`), the curated list prepends no 0xeee… sentinel
+// row there, so this entry is what leads the dApp picker. Its 6 decimals are
+// the ERC20 view of a balance the EVM itself treats as 18-decimal — the
+// on-chain decimals() below is the only value safe for calldata. WETH here is
+// BRIDGED ETH, not a wrapper of the native asset (Arc has none).
+const ARC_5042: BuiltinToken[] = [
+  { address: "0x3600000000000000000000000000000000000000", symbol: "USDC", decimals: 6, name: "USDC", logoURI: "https://coin-images.coingecko.com/coins/images/6319/small/USDC.png?1769615602" },
+  { address: "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1", symbol: "EURC", decimals: 6, name: "EURC", logoURI: "https://coin-images.coingecko.com/coins/images/26045/small/EURC.png?1769615705" },
+  { address: "0x8a5D989Bbb96929F689B0200f435f53dA42bF490", symbol: "USYC", decimals: 6, name: "US Yield Coin" },
+  { address: "0x128cC466B61f542da60c70e3aA11c10e19B84EDB", symbol: "WETH", decimals: 18, name: "Wrapped Ether", logoURI: "https://assets.coingecko.com/coins/images/39810/small/weth.png" },
+  { address: "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0", symbol: "cirBTC", decimals: 8, name: "Circle Wrapped Bitcoin" },
+];
+
 // chainId → builtin token list. Add a future chain's array here.
 const BUILTIN_TOKENS: Record<number, BuiltinToken[]> = {
   4663: ROBINHOOD_4663,
   100: GNOSIS_100,
   57073: INK_57073,
+  5042: ARC_5042,
 };
 
 /** Builtin tokens for a chain, or [] when the chain has no static table. */

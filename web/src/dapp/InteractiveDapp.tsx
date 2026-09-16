@@ -270,6 +270,7 @@ export function InteractiveDapp({ mode, sid }: { mode: ApiMode; sid: string }) {
   // Per-chain default pair (symbols looked up in the curated list). Chains
   // absent from this table keep the generic rule (USDT-ish in, native out).
   const DEFAULT_PAIR: Record<string, { in: string; out: string }> = {
+    arc: { in: "USDC", out: "EURC" },
     robinhood: { in: "USDG", out: "TSLA" },
     monad: { in: "USDC", out: "MON" },
     plasma: { in: "USDT0", out: "XPL" },

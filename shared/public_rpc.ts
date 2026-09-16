@@ -15,6 +15,7 @@ export const CORS_OPEN_RPC: Record<number, string> = {
   250: "https://fantom-rpc.publicnode.com",
   999: "https://rpc.hyperliquid.xyz/evm",
   4663: "https://rpc.mainnet.chain.robinhood.com",
+  5042: "https://arc-rpc.publicnode.com",
   8453: "https://base-rpc.publicnode.com",
   9745: "https://rpc.plasma.to",
   57073: "https://rpc-gel.inkonchain.com",

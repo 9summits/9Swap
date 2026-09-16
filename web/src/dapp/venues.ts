@@ -85,6 +85,7 @@ const CHAIN_SLUG: Record<number, string> = {
   137: "polygon",
   100: "gnosis",
   57073: "ink",
+  5042: "arc",
 };
 
 // Robinhood (4663) has no DeFiLlama chain icon yet, so the badge is inlined:
@@ -123,6 +124,8 @@ const CHAIN_TINT: Record<number, string> = {
   137: "#8247e5",
   100: "#04795b",
   57073: "#7132f5",
+  // Arc docs primary colour.
+  5042: "#3e74bb",
 };
 
 export function ctint(chainId: number): string {

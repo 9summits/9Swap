@@ -18,6 +18,10 @@ import { getReferralConfig } from "../referral.ts";
 
 // 1inch Fusion runs on every chain the classic /swap/v6 product covers.
 // Tighten the whitelist as Fusion's chain coverage evolves.
+// Arc (5042) is deliberately ABSENT: the quoter does answer for it, but the
+// resolver `whitelist` it returns is six zero addresses — no resolver is
+// onboarded on Arc, so an order would be signed and never filled (probed
+// 2026-09-16). Flip it on once the whitelist holds real resolvers.
 const FUSION_SUPPORTED_CHAIN_IDS = new Set([
   1, 10, 56, 100, 130, 137, 143, 250, 8453, 42161, 43114, 59144, 324, 146,
   4663,

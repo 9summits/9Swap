@@ -189,6 +189,37 @@ export type SimulateError =
   | { kind: "balance-slot-not-found"; token: string }
   | { kind: "rpc"; message: string };
 
+// Native balance handed to the pranked sender: plenty for gas on any chain.
+const SIM_GAS_BUDGET = 100n * 10n ** 18n;
+
+/**
+ * Native-`balance` override for the pranked sender.
+ *
+ * `nativeInDecimals === null` → the input is a plain ERC20, funded through a
+ * `stateDiff` on its balances slot; the sender only needs gas.
+ *
+ * Otherwise the input IS the native asset and must be added on top:
+ *   - 18 for the 0xeee… sentinel (EVM-level units, 1:1),
+ *   - the token's ERC20 decimals on a chain whose gas token is an ERC20
+ *     (Arc: USDC at 0x3600…0000 — ONE balance with two views, 18 decimals at
+ *     the EVM level, 6 through the ERC20 interface), where the ERC20 amount
+ *     is scaled up by 10^(18 - decimals) to reach the EVM-level view.
+ */
+export function senderNativeBalanceOverride(p: {
+  tokenInAmount: bigint;
+  nativeInDecimals: number | null;
+}): bigint {
+  if (p.nativeInDecimals === null) return SIM_GAS_BUDGET;
+  const scale = 18 - p.nativeInDecimals;
+  if (scale < 0) {
+    throw new Error(
+      `native ERC20 has ${p.nativeInDecimals} decimals — more than the ` +
+        "18-decimal EVM-level balance; refusing to scale down the input",
+    );
+  }
+  return SIM_GAS_BUDGET + p.tokenInAmount * 10n ** BigInt(scale);
+}
+
 export async function simulateSwap(opts: {
   rpc: string;
   sender: string;
@@ -205,6 +236,15 @@ export async function simulateSwap(opts: {
    * renderer can group/annotate (e.g. "REFERRAL" vs "velora vault").
    */
   watches?: WatchSpec[];
+  /**
+   * Set on chains whose gas token IS an ERC20 (Arc: USDC at 0x3600…0000),
+   * and only when `tokenIn` is that token — `decimals` are its ERC20
+   * decimals (6 on Arc). Such a token has no `balances` mapping to probe:
+   * its balance IS the account's native balance, so the input is funded
+   * through the sender's `balance` override instead of a `stateDiff`.
+   * null / absent everywhere else.
+   */
+  nativeErc20?: { address: string; decimals: number } | null;
 }): Promise<{ ok: SimulateResult } | { err: SimulateError }> {
   const {
     rpc,
@@ -220,18 +260,32 @@ export async function simulateSwap(opts: {
 
   const isNativeIn = tokenIn.toLowerCase() === NATIVE_SENTINEL;
   const isNativeOut = tokenOut.toLowerCase() === NATIVE_SENTINEL;
+  // Arc model: one balance, two views. eth_getBalance / msg.value / the
+  // state override's `balance` field speak 18 decimals; the ERC20 at
+  // 0x3600…0000 (balanceOf / transferFrom / calldata) speaks 6. Funding the
+  // input therefore means topping up the native balance by
+  // amountIn * 10^(18-6), never writing a storage slot — there is none.
+  const nativeErc20In =
+    opts.nativeErc20 &&
+    tokenIn.toLowerCase() === opts.nativeErc20.address.toLowerCase()
+      ? opts.nativeErc20
+      : null;
+  // ERC20-funded input: the sender's native balance only covers gas.
+  const fundViaStateDiff = !isNativeIn && !nativeErc20In;
 
   const stateOverrides: Record<string, unknown> = {};
 
-  // Sender always needs a chunky native balance for gas. For native input
-  // we also need amountIn worth of ETH on top.
-  const gasBudget = 100n * 10n ** 18n;
-  const senderNativeBalance = isNativeIn ? gasBudget + tokenInAmount : gasBudget;
+  // Sender always needs a chunky native balance for gas; native input (either
+  // flavour) adds amountIn on top, in EVM-level units.
+  const senderNativeBalance = senderNativeBalanceOverride({
+    tokenInAmount,
+    nativeInDecimals: isNativeIn ? 18 : nativeErc20In ? nativeErc20In.decimals : null,
+  });
   stateOverrides[sender.toLowerCase()] = {
     balance: hexUint(senderNativeBalance),
   };
 
-  if (!isNativeIn) {
+  if (fundViaStateDiff) {
     const slot = await findBalanceSlot(rpc, tokenIn, sender);
     if (slot === null) {
       return { err: { kind: "balance-slot-not-found", token: tokenIn } };
@@ -254,7 +308,10 @@ export async function simulateSwap(opts: {
   const calls: SimulateV1Call[] = [];
   // [0] pre-balance read
   calls.push({ to: balanceCallTarget, data: balanceCallData });
-  // [1] approve (only for ERC20 input)
+  // [1] approve (any ERC20 input — including a native ERC20 like Arc's USDC,
+  // which is still pulled through transferFrom by kyber / 1inch / openocean.
+  // Venues paid via msg.value simply ignore the allowance, so keeping the
+  // call here costs nothing and never under-authorises the swap).
   if (!isNativeIn) {
     calls.push({
       to: tokenIn,

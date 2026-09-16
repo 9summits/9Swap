@@ -27,6 +27,9 @@ function nativeUsdFor(chain: ChainInfo): number | null {
   // (BNB, AVAX, HYPE). For non-ETH natives we don't guess — leave
   // gasUsd null and let the renderer show "—".
   if (chain.nativeSymbol === "ETH") return ETH_USD;
+  // Arc pays gas in USDC — the native price is $1 by construction, no
+  // hardcoded spot needed (and the gas column is meaningful there).
+  if (chain.nativeSymbol === "USDC") return 1;
   return null;
 }
 

@@ -165,8 +165,12 @@ async function loadTokenList(chain: ChainInfo): Promise<ListedToken[]> {
     decimals: 18,
     ...(NATIVE_LOGO[chain.nativeSymbol] ? { logoURI: NATIVE_LOGO[chain.nativeSymbol] } : {}),
   };
+  // On a chain whose gas token is an ERC20 (Arc: USDC at 0x3600…0000) the
+  // sentinel is not a tradeable asset — the builtin table's entry for that
+  // ERC20 leads the list instead. `seen` still holds the sentinel so nothing
+  // downstream can slip a 0xeee… row back in.
   const seen = new Set<string>([NATIVE_SENTINEL]);
-  const tokens: ListedToken[] = [native];
+  const tokens: ListedToken[] = chain.nativeErc20 ? [] : [native];
   // Builtin static tables (on-chain-verified) next, so chains KyberSwap
   // doesn't index (Robinhood 4663) still list their full curated set. For
   // indexed chains builtinTokens() is empty and this loop is a no-op — the
@@ -221,6 +225,8 @@ const UNISWAP_GQL_CHAIN: Record<number, string> = {
   // 100 (Gnosis) is not in their Chain enum — skipped.
   // 999 (HyperEVM) is not in their Chain enum — skipped.
   // 57073 (Ink) — Chain enum introspection blocked; skipped.
+  // 5042 (Arc) — not verified against their Chain enum; skipped. Arc's
+  // builtins ship their own logoURI, so the picker is unaffected.
 };
 
 async function fillMissingLogos(chainId: number, tokens: ListedToken[]): Promise<void> {
@@ -470,7 +476,12 @@ export async function resolveRouteHops(p: {
   put(p.tokenIn.address, { symbol: p.tokenIn.symbol, name: p.tokenIn.name, decimals: p.tokenIn.decimals });
   put(p.tokenOut.address, { symbol: p.tokenOut.symbol, name: p.tokenOut.name, decimals: p.tokenOut.decimals });
   put(NATIVE_SENTINEL, { symbol: p.chain.nativeSymbol, name: p.chain.nativeSymbol, decimals: 18 });
+  // Hints only FILL unknown addresses — they never override the pair
+  // endpoints (or the sentinel) we resolved ourselves. Venue metadata can be
+  // wrong: OpenOcean reports Arc USDC (0x3600…0000) as 18 decimals when the
+  // chain says 6, which would mis-humanise every hop amount in the tooltip.
   for (const [addr, hint] of p.quote.tokenHints) {
+    if (meta.has(addr.toLowerCase())) continue;
     put(addr, { symbol: hint.symbol, name: hint.name, decimals: hint.decimals });
   }
   const unknown = new Set<string>();
@@ -593,11 +604,37 @@ export type AllowanceResult = {
 export function needsAllowanceCheck(tokenIn: Token, venue: string, chain: ChainInfo): boolean {
   if (tokenIn.address.toLowerCase() === NATIVE_SENTINEL) return false;
   if (venue === "send" || venue === "wrap") return false;
-  if (detectWrap({ chain, tokenInAddress: tokenIn.address, tokenOutAddress: chain.wrappedNative })) {
+  // Chains with no wrapped-native (Arc) have no unwrap path to exempt.
+  const wrapped = chain.wrappedNative;
+  if (wrapped && detectWrap({ chain, tokenInAddress: tokenIn.address, tokenOutAddress: wrapped })) {
     // unwrap path (WETH in) — withdraw() needs no approval
-    if (tokenIn.address.toLowerCase() === chain.wrappedNative.toLowerCase()) return false;
+    if (tokenIn.address.toLowerCase() === wrapped.toLowerCase()) return false;
   }
   return true;
+}
+
+/**
+ * True when the built tx pays its input out of msg.value even though the
+ * input is an ERC20 — the case on chains whose gas token IS an ERC20 (Arc:
+ * USDC at 0x3600…0000). Uniswap's Arc build sets
+ * `value = amountIn * 10^12` and settles from the router's own balance
+ * (v4 SETTLE payerIsUser=false), so an approval would be a wasted extra tx.
+ *
+ * Deliberately narrow — chain has a nativeErc20, input IS it, sync tx, value
+ * > 0 — and fail-safe in the right direction: if some future build both set
+ * a value AND pulled via Permit2/transferFrom, skipping the approval makes
+ * that tx revert (the user loses gas, nothing else). The opposite mistake,
+ * granting an allowance that isn't needed, leaves standing spend authority.
+ */
+export function inputPaidViaValue(
+  chain: ChainInfo,
+  tokenInAddress: string,
+  build: { kind: BuildResult["kind"]; value?: string | null } | null,
+): boolean {
+  if (!chain.nativeErc20) return false;
+  if (!build || build.kind !== "tx") return false;
+  if (tokenInAddress.toLowerCase() !== chain.nativeErc20.toLowerCase()) return false;
+  return BigInt(build.value ?? "0") > 0n;
 }
 
 // Reads allowance(owner, spender) and, when short, builds an exact-amount

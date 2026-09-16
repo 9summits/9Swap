@@ -24,7 +24,7 @@ default `<amount>` is **tokenIn** (exact-in / sell). With `--exact-out` it is
 ```
 src/
   index.ts          entry point; commander wiring, orchestration
-  chains.ts         chain alias table (eth/arb/base/op/bsc/avax/hype/unichain/robinhood/monad/plasma/polygon/gnosis/ink) — chainId, kyberPath, coingeckoPlatform, explorer, wrappedNative
+  chains.ts         chain alias table (eth/arc/arb/base/op/bsc/avax/hype/unichain/robinhood/monad/plasma/polygon/gnosis/ink) — chainId, kyberPath, coingeckoPlatform, explorer, wrappedNative
   tokens.ts         symbol/address → Token resolution (KyberSwap ks-setting → CoinGecko fallback)
   amount.ts         bigint base-unit conversion + USD formatting
   trade_side.ts     TradeSide sell|buy, BUY_CAPABLE_VENUES, amountIn XOR amountOut parsers
@@ -280,6 +280,18 @@ The approve tx uses exact `amountIn` (not infinite) for safety and
 minimum-trust reasoning. Users wanting infinite approval can call
 `approve(spender, uint256.max)` themselves.
 
+**Skipped when the router is paid natively** — `inputPaidViaValue(chain,
+tokenInAddress, build)` in `src/core.ts` returns true when the chain has a
+`nativeErc20`, the input IS that token, the build is a sync `tx` and its
+`value > 0`. That's Uniswap's Arc route: `value = amountIn × 10^12` and the v4
+`SETTLE` pays from the router's own balance (`payerIsUser=false`), so an
+approval would be a pointless second transaction. Both the CLI (`src/index.ts`)
+and the dApp's `/api/build` (`src/server/handlers.ts`, `approval: null`) skip
+the allowance read in that case. The predicate is deliberately narrow and
+fail-safe in the right direction: a hypothetical build that set a value *and*
+pulled via Permit2 would revert (gas lost, nothing over-spent), whereas a
+needless approval leaves standing spend authority behind.
+
 Also fetched via `eth_maxPriorityFeePerGas`: `maxPriorityFeePerGas` is surfaced
 on the swap tx and the approve tx as a separate `priorityFee` row. Together with
 the aggregator's `gasPrice`, users can construct a proper EIP-1559 transaction.
@@ -402,17 +414,41 @@ Defined in `src/chains.ts`. Adding a chain means adding a `ChainInfo` with:
   Gnosis and Ink.
 - `coingeckoPlatform` — the key CoinGecko uses in `platforms` /
   `detail_platforms` (e.g. `arbitrum-one`, `hyperevm`)
-- `nativeSymbol` (`ETH`, `AVAX`, `HYPE`, …) and `explorer` (etherscan-style base
-  URL)
+- `nativeSymbol` (`ETH`, `AVAX`, `HYPE`, `USDC`, …) and `explorer`
+  (etherscan-style base URL)
 - `wrappedNative` — canonical WETH9-equivalent for the chain. Used by the
-  wrap/unwrap short-circuit.
+  wrap/unwrap short-circuit. Nullable: `null` means the chain has no WETH9-style
+  wrapper and the short-circuit never fires there. Currently `null` on Arc.
+- `nativeErc20` — set only when the chain's gas token is itself an ERC20.
+  `null` everywhere except Arc.
 
 Each venue adapter has its own chainId whitelist; add the new chain id there if
 the venue supports it.
 
-Gnosis and Ink have no KyberSwap ks-setting token list (0 tokens), so their
-curated lists live in `src/tokens_builtin.ts` — the same fallback used for
-Robinhood.
+### Arc's native model (`nativeErc20`)
+
+Arc (5042) pays gas in USDC, and the same balance is visible two ways: **18
+decimals** at the EVM level (`msg.value`, `eth_getBalance`, gas accounting) and
+**6 decimals** through an ERC20 interface at `0x3600…0000`. Circle's docs say to
+use the ERC20 view, and only that view produces correct calldata — the other is
+off by 10^12. There is also no WETH9-style wrapper for it (the bridged `WETH` at
+`0x128cC466…84EDB` is bridged ETH, not a wrapper of the native asset).
+
+So on a chain with `nativeErc20` set:
+
+- the native symbol (`USDC` on Arc) resolves to that ERC20, with the builtin
+  table's on-chain-verified decimals;
+- the curated token list does **not** prepend the synthetic `0xeee…` entry — the
+  builtin table leads instead;
+- passing `0xeee…` explicitly is a hard error naming the ERC20 address, rather
+  than a silently mis-scaled quote;
+- `wrappedNative` is `null`, so wrap/unwrap is disabled (see below).
+
+Gnosis, Ink and Arc have their curated lists in `src/tokens_builtin.ts` — the
+same fallback used for Robinhood. Gnosis and Ink have no KyberSwap ks-setting
+token list at all (0 tokens); Arc is indexed but its whitelist is mostly
+memecoins and omits the majors, and its USDC entry needs a trusted 6-decimals
+value.
 
 ## Native ↔ wrapped-native short-circuit
 
@@ -436,6 +472,11 @@ resolution. When matched:
 - `-v all` / `-v <list>` are ignored when the pair triggers wrap mode; the
   comparison block is suppressed. `wrap` is never user-selectable — only
   auto-applied.
+
+Chains with `wrappedNative: null` have no wrap/unwrap at all: `detectWrap()`
+returns `null` immediately, so every pair goes through the venue loop. Arc is
+the case — its native USDC has no WETH9-style wrapper, and the bridged `WETH`
+that exists there is bridged ETH, not a wrapper of the gas token.
 
 The pseudo-venue cast (`"wrap" as Venue` in `synthQuote`) is the only place we
 widen the type. Renderers and JSON output treat `quote.venue` as a string label,
@@ -467,7 +508,8 @@ construction.
 
 Skipped when (a) the chain's native isn't ETH (BNB / AVAX / HYPE — no point
 hardcoding their prices for a comparison-only display) or (b) `gasUnits` is
-missing and not derivable.
+missing and not derivable. Arc is the exception among non-ETH natives: it pays
+gas in USDC, so `nativeUsdFor` returns 1 by construction, no hardcoded spot.
 
 ## Simulation (`--simulate` / `--simu`)
 
@@ -479,6 +521,13 @@ Sync-venue only. After building the swap tx (auto-implies `-d`), the CLI runs
    sentinel state override; the slot whose `balanceOf(sender)` returns the
    sentinel is the one). For native input, override `sender.balance` directly.
    Either way the chain isn't touched — overrides only live inside the simulation.
+   On a chain whose gas token IS an ERC20 (`chain.nativeErc20`, i.e. Arc's USDC
+   at `0x3600…0000`) there is no balances slot to probe — the token's balance is
+   the account's native balance. `simulateSwap` takes `nativeErc20` and funds
+   that input through `sender.balance` instead, scaling the ERC20 amount up by
+   `10^(18 - decimals)` (10^12 on Arc) to reach the 18-decimal EVM-level view.
+   The approve call stays in the batch: kyber / 1inch / openocean still pull
+   Arc USDC via `transferFrom`.
 2. **Run approve + swap in one `eth_simulateV1` block.** Both calls share state,
    so the approve sets the allowance the swap consumes. Native input skips the
    approve.

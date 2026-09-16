@@ -32,6 +32,8 @@ export function detectWrap(args: {
   tokenInAddress: string;
   tokenOutAddress: string;
 }): WrapMode | null {
+  // No WETH9-style wrapper on this chain (Arc) — nothing to short-circuit.
+  if (args.chain.wrappedNative === null) return null;
   const wrapped = args.chain.wrappedNative.toLowerCase();
   const inLc = args.tokenInAddress.toLowerCase();
   const outLc = args.tokenOutAddress.toLowerCase();
@@ -50,6 +52,14 @@ export function synthQuote(args: {
   tokenOutAddress: string;
   amountIn: bigint;
 }): NormalizedQuote {
+  // Same unreachable guard as buildWrapTx: only a matched detectWrap gets
+  // here, and that never matches when the chain has no wrapper.
+  if (args.chain.wrappedNative === null) {
+    throw new Error(
+      `${args.chain.displayName} has no wrapped-native token — wrap/unwrap is not available on this chain`,
+    );
+  }
+  const wrapped = args.chain.wrappedNative;
   const exchange =
     args.mode === "wrap"
       ? `${args.chain.nativeSymbol} → W${args.chain.nativeSymbol} (deposit)`
@@ -60,7 +70,7 @@ export function synthQuote(args: {
       tokenOut: args.tokenOutAddress.toLowerCase(),
       exchange,
       swapAmount: args.amountIn.toString(),
-      pool: args.chain.wrappedNative.toLowerCase(),
+      pool: wrapped.toLowerCase(),
     },
   ];
   return {
@@ -77,10 +87,10 @@ export function synthQuote(args: {
     gasUnits: null,
     gasPriceWei: null,
     gasUsd: null,
-    router: args.chain.wrappedNative,
+    router: wrapped,
     hops,
     tokenHints: new Map(),
-    raw: { mode: args.mode, wrappedNative: args.chain.wrappedNative },
+    raw: { mode: args.mode, wrappedNative: wrapped },
   };
 }
 
@@ -90,6 +100,14 @@ export function buildWrapTx(args: {
   amountIn: bigint;
   mode: WrapMode;
 }): NormalizedTx {
+  // Unreachable in practice — detectWrap already returned null on a chain
+  // with no wrapper, so nothing routes a wrap/unwrap here. Kept as a hard
+  // guard (and to narrow the nullable field) rather than a non-null assertion.
+  if (args.chain.wrappedNative === null) {
+    throw new Error(
+      `${args.chain.displayName} has no wrapped-native token — wrap/unwrap is not available on this chain`,
+    );
+  }
   const wrapped = toChecksumAddress(args.chain.wrappedNative);
   if (args.mode === "wrap") {
     // deposit() — selector + msg.value carries the amount. No args.

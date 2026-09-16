@@ -23,6 +23,10 @@ const ONEINCH_SUPPORTED_CHAIN_IDS = new Set([
   // 13 HYPEREVM_* protocols (HyperSwap, Hybra, Curve Stable NG, KittenSwap,
   // Ramses, …) and /quote + /swap return real amounts / calldata.
   999,
+  // Arc (5042) — verified live 2026-09-16: /quote + /swap answer and the API
+  // returns Arc's own router (0xe08cab08…a6bda) as tx.to, which the adapter
+  // already uses as the approval spender.
+  5042,
 ]);
 
 type OneinchProtocol = {

@@ -23,6 +23,8 @@ const MATCHA_FEE_BPS_MAX = 1000;
 const ZEROEX_SUPPORTED_CHAIN_IDS = new Set([
   1, 10, 56, 130, 137, 143, 8453, 42161, 43114, 59144, 534352, 81457, 9745,
   4663, 57073,
+  // Arc (5042) — verified live 2026-09-16 (100 USDC → EURC quotes + builds).
+  5042,
 ]);
 
 const ZEROEX_NATIVE = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";

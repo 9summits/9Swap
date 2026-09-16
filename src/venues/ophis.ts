@@ -214,9 +214,17 @@ async function postQuote(
 // The on-chain sell token for the orderbook quote: native ETH sells as WETH
 // (eth-flow wraps it), everything else sells as itself.
 function quoteSellToken(chain: ChainInfo, tokenIn: string): string {
-  return tokenIn.toLowerCase() === NATIVE_SENTINEL
-    ? chain.wrappedNative.toLowerCase()
-    : tokenIn.toLowerCase();
+  if (tokenIn.toLowerCase() !== NATIVE_SENTINEL) return tokenIn.toLowerCase();
+  // eth-flow needs a wrapper to sell native through. Chains without one (Arc,
+  // where the gas token is itself an ERC20) never reach here — ophis doesn't
+  // serve them — but fail loud rather than deref a null.
+  if (chain.wrappedNative === null) {
+    throw new Error(
+      `ophis cannot sell native ${chain.nativeSymbol} on ${chain.displayName}: ` +
+        `the chain has no wrapped-native token`,
+    );
+  }
+  return chain.wrappedNative.toLowerCase();
 }
 
 /** Exact-in (sell) vs exact-out (buy). Matches orderbook `kind`. */

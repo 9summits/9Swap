@@ -188,6 +188,10 @@ export async function resolveToken(
 
   const upper = input.toUpperCase();
   if (upper === chain.nativeSymbol) {
+    // Chains whose gas token is a real ERC20 (Arc: USDC) have no sentinel
+    // balance to swap — resolve the symbol to the ERC20 so decimals come
+    // from the token (6 on Arc), not from the 18-decimal EVM-level view.
+    if (chain.nativeErc20) return resolveByAddress(chain.nativeErc20, chain);
     return {
       address: NATIVE_SENTINEL,
       symbol: chain.nativeSymbol,
@@ -446,6 +450,17 @@ async function resolveByAddress(
   const lower = address.toLowerCase();
 
   if (lower === NATIVE_SENTINEL) {
+    // No sentinel-native on chains where the gas token is an ERC20 (Arc):
+    // the two views of the same balance carry different decimals (18 at the
+    // EVM level vs 6 on the token), so silently accepting 0xeee… here would
+    // hand every venue an amount scaled by 10^12.
+    if (chain.nativeErc20) {
+      throw new Error(
+        `${chain.displayName} has no separate native token: ${chain.nativeSymbol}'s native ` +
+          `balance is exposed through the ERC-20 interface at ${chain.nativeErc20} ` +
+          `— pass that address or the symbol ${chain.nativeSymbol}.`,
+      );
+    }
     return {
       address: NATIVE_SENTINEL,
       symbol: chain.nativeSymbol,

@@ -63,6 +63,11 @@ const OPENOCEAN_CHAIN_CODE: Record<number, string> = {
   43114: "avax",
   // Numeric /v4/4663 returns 500; the slug is the working path.
   4663: "robinhood",
+  // Arc (5042) — verified live 2026-09-16; both "arc" and the numeric id
+  // work, the slug matches the docs. Note their Arc token metadata reports
+  // USDC (0x3600…0000) as 18 decimals when the chain says 6 — we only ever
+  // use venue decimals for display hints, never for calldata.
+  5042: "arc",
 };
 
 // OpenOcean's own cap on partner fees, per their docs (range 0.01%

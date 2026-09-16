@@ -146,6 +146,8 @@ export function detectMode(args: {
   if (args.isSend) return "send";
   const { chain, tokenIn, tokenOut } = args;
   if (!tokenIn || !tokenOut) return "swap";
+  // No wrapper on this chain (Arc) — nothing can be a wrap/unwrap pair.
+  if (!chain.wrappedNative) return "swap";
   const inLc = tokenIn.address.toLowerCase();
   const outLc = tokenOut.address.toLowerCase();
   const wrapped = chain.wrappedNative.toLowerCase();

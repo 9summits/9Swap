@@ -73,6 +73,7 @@ const LLAMA_CHAIN: Record<number, string> = {
   143: "monad",
   999: "hyperliquid",
   4663: "robinhood",
+  5042: "arc",
   8453: "base",
   9745: "plasma",
   42161: "arbitrum",

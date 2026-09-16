@@ -169,6 +169,7 @@ test("chain aliases are the CLI set", () => {
     "polygon",
     "gnosis",
     "ink",
+    "arc",
   ];
   const rows: CustomTokenCsvRow[] = aliases.map((chain, i) => ({
     chain,
