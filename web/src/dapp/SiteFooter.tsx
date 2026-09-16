@@ -7,6 +7,8 @@ const GITHUB_URL = "https://github.com/9summits/9Swap";
 // Static pages served from web/public — same origin as the deployed dApp.
 const DOCS_URL = "/docs.html";
 const DISCLAIMER_URL = "/disclaimer.html";
+// Anchor of the "03 Privacy" section inside the disclaimer page.
+const PRIVACY_URL = `${DISCLAIMER_URL}#privacy`;
 // Build-time short SHA from vite.config.ts (`git rev-parse --short` / Vercel).
 const APP_COMMIT =
   typeof __APP_COMMIT__ === "string" && __APP_COMMIT__ ? __APP_COMMIT__ : "unknown";
@@ -16,8 +18,9 @@ const COMMIT_URL =
     : GITHUB_URL;
 
 // Page footer for the interactive dApp: contact (click-to-copy email) + CLI
-// docs + disclaimer + the short git commit of this dApp build (links
-// to the matching GitHub commit), centered.
+// docs + disclaimer + open source (GitHub repo) + the no-tracking pledge
+// (anchored on the disclaimer's Privacy section) + the short git commit of
+// this dApp build (links to the matching GitHub commit), centered.
 export function SiteFooter() {
   const [copied, setCopied] = React.useState(false);
   const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -63,6 +66,29 @@ export function SiteFooter() {
         </span>
         <a href={DISCLAIMER_URL} style={s.link}>
           <span>Disclaimer</span>
+        </a>
+        <span style={s.dot} aria-hidden>
+          ·
+        </span>
+        <a
+          href={GITHUB_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={s.link}
+          title="Source code on GitHub"
+        >
+          <span>Open source</span>
+          <span style={s.muted}>GitHub</span>
+        </a>
+        <span style={s.dot} aria-hidden>
+          ·
+        </span>
+        <a
+          href={PRIVACY_URL}
+          style={s.link}
+          title="No accounts. No cookies. No trackers. No analytics script. No advertising. No personal data collection."
+        >
+          <span>No cookies, no trackers</span>
         </a>
         <span style={s.dot} aria-hidden>
           ·
