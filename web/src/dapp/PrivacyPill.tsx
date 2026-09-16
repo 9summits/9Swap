@@ -6,7 +6,11 @@ import { Icon } from "./icons";
 // section, with an inline "i" glyph advertising that there is more to read.
 // The tooltip is custom rather than a native `title` — the browser's own bubble
 // waits ~1s and renders unstyled plain text, which reads as a bug next to the
-// rest of the dApp chrome. Anchor: /disclaimer.html#privacy ("03 Privacy").
+// rest of the dApp chrome. The bubble is hoverable: it hangs off an anchor that
+// starts flush against the pill (the 8px gap is padding, not a dead zone) and
+// takes pointer events, so the cursor can travel down into it and click the
+// "Read the full privacy notice" link it carries.
+// Anchor: /disclaimer.html#privacy ("03 Privacy").
 
 // Anchor of the "03 Privacy" section inside the disclaimer page (same origin).
 const PRIVACY_URL = "/disclaimer.html#privacy";
@@ -26,15 +30,34 @@ const TIP_CSS = `@keyframes swaggPrivacyTipIn{from{opacity:0;transform:translate
 
 export function PrivacyPill() {
   const [open, setOpen] = React.useState(false);
+  const closeTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    };
+  }, []);
+
+  function show() {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setOpen(true);
+  }
+
+  // Closing is deferred so a diagonal move from the pill to the bubble, which
+  // briefly leaves the wrapper, doesn't snatch the tooltip away mid-travel.
+  function hide() {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => setOpen(false), 150);
+  }
 
   return (
     <span
       style={s.wrap}
       data-privacy-pill
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      onFocus={() => setOpen(true)}
-      onBlur={() => setOpen(false)}
+      onMouseEnter={show}
+      onMouseLeave={hide}
+      onFocus={show}
+      onBlur={hide}
     >
       <style>{TIP_CSS}</style>
       <a
@@ -49,20 +72,24 @@ export function PrivacyPill() {
         </Badge>
       </a>
       {open && (
-        <div id={TIP_ID} role="tooltip" style={s.tip}>
-          <div style={s.tipTitle}>
-            <Icon name="info" size={12} style={{ color: "var(--text-link)", flex: "none" }} />
-            No tracking
+        <div style={s.tipAnchor}>
+          <div id={TIP_ID} role="tooltip" style={s.tip}>
+            <div style={s.tipTitle}>
+              <Icon name="info" size={12} style={{ color: "var(--text-link)", flex: "none" }} />
+              No tracking
+            </div>
+            <div style={s.grid}>
+              {PLEDGES.map((p) => (
+                <div key={p} style={s.item}>
+                  <Icon name="check" size={11} style={{ color: "var(--positive)", flex: "none" }} />
+                  {p}
+                </div>
+              ))}
+            </div>
+            <a href={PRIVACY_URL} style={s.footLink}>
+              Read the full privacy notice →
+            </a>
           </div>
-          <div style={s.grid}>
-            {PLEDGES.map((p) => (
-              <div key={p} style={s.item}>
-                <Icon name="check" size={11} style={{ color: "var(--positive)", flex: "none" }} />
-                {p}
-              </div>
-            ))}
-          </div>
-          <div style={s.foot}>Click for the full privacy notice</div>
         </div>
       )}
     </span>
@@ -80,11 +107,10 @@ const s: Record<string, React.CSSProperties> = {
   },
   // Inherits the badge's text color (Icon strokes with currentColor).
   infoIcon: { flex: "none", opacity: 0.8, marginLeft: 1 },
+  // Flush against the pill: the visual gap is padding, so the pointer never
+  // leaves the wrapper on its way down to the bubble.
+  tipAnchor: { position: "absolute", top: "100%", left: 0, paddingTop: 8, zIndex: 5 },
   tip: {
-    position: "absolute",
-    top: "calc(100% + 8px)",
-    left: 0,
-    zIndex: 5,
     width: 290,
     padding: "10px 12px 10px",
     borderRadius: 10,
@@ -94,7 +120,6 @@ const s: Record<string, React.CSSProperties> = {
     color: "var(--text-primary)",
     fontFamily: "var(--font-sans)",
     fontSize: 12,
-    pointerEvents: "none",
     animation: "swaggPrivacyTipIn 140ms ease-out",
     textAlign: "left",
     whiteSpace: "normal",
@@ -115,12 +140,14 @@ const s: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     color: "var(--text-primary)",
   },
-  foot: {
+  footLink: {
+    display: "block",
     marginTop: 9,
     paddingTop: 8,
     borderTop: "1px solid var(--border-subtle)",
     fontSize: 11,
-    fontWeight: 500,
-    color: "var(--text-tertiary)",
+    fontWeight: 600,
+    color: "var(--text-link)",
+    textDecoration: "none",
   },
 };
