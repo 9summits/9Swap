@@ -9,6 +9,9 @@ import type { HeaderProps, ChainMeta } from "./types";
 import { InstallCliBar } from "./InstallCliBar";
 import { PrivacyPill } from "./PrivacyPill";
 
+// Chains flagged "New" in the picker. Remove an alias once it stops being news.
+const NEW_CHAIN_ALIASES = new Set(["arc"]);
+
 // dApp Header — ported from the swap prototype's <Header> + <ChainChip>
 // (/tmp/9s-design/ui_kits/swap/app.jsx). Left: the 9Summits "9" mark +
 // "9Swap" wordmark, then the Beta badge and, next to it, the "No tracking"
@@ -201,6 +204,11 @@ function ChainSelector({ chains, chain, onChain, locked }: HeaderProps) {
               >
                 <ChainMark chain={c} />
                 <span style={s.menuName}>{c.name}</span>
+                {NEW_CHAIN_ALIASES.has(c.alias) && (
+                  <Badge tone="brand" variant="soft" size="sm" aria-label="New chain">
+                    New
+                  </Badge>
+                )}
                 <span style={s.menuMeta}>{c.nativeSymbol}</span>
                 {selected && (
                   <Icon
