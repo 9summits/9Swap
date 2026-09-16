@@ -212,9 +212,18 @@ export function InteractiveDapp({ mode, sid }: { mode: ApiMode; sid: string }) {
   // for them. wagmi's own reconnect() is not enough: the safe connector's
   // isAuthorized() swallows the getInfo timeout in a bare catch and answers
   // false, so a first load inside the Safe would otherwise stay disconnected.
+  // wagmi starts at "disconnected" BEFORE reconnect() runs (child effects fire
+  // first), so wait for the connecting/reconnecting pass to settle: connecting
+  // in parallel with it would spin up two Safe SDK instances on one frame.
   const safeAutoConnectFired = React.useRef(false);
+  const reconnectSeen = React.useRef(false);
   React.useEffect(() => {
-    if (status !== "disconnected" || safeAutoConnectFired.current) return;
+    if (status === "connecting" || status === "reconnecting") {
+      reconnectSeen.current = true;
+      return;
+    }
+    if (status !== "disconnected" || !reconnectSeen.current) return;
+    if (safeAutoConnectFired.current) return;
     if (typeof window === "undefined" || window.parent === window) return;
     const safeConnector = connectors.find((c) => c.id === "safe");
     if (!safeConnector) return;
