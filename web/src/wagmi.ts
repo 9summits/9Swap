@@ -149,11 +149,23 @@ export function buildWagmiConfig(args: {
   // and those connectors share the extension's provider instance, which the
   // reconnect dedup handles correctly. rabbyWallet stays: getInjectedConnector
   // targets the extension's own injected provider, same dedup story.
+  //
+  // Framed means inside app.safe.global (the CSP frame-ancestors allowlist
+  // admits no other host), so the Safe connector is the only wallet that can
+  // work there. Listing the others is not just noise: wagmi's reconnect()
+  // walks every connector in series and useAccount() exposes no address until
+  // the loop ends, and WalletConnect init plus the extensions' EIP-6963 probes
+  // inside a cross-origin iframe took ~40 s, during which the dApp sat on
+  // "Connect Wallet" with the Safe already authorized.
+  const framed = typeof window !== "undefined" && window.parent !== window;
+  const wallets = framed
+    ? [safeAppWallet]
+    : [injectedWallet, rabbyWallet, ...wcWallets];
   const connectors = connectorsForWallets(
     [
       {
         groupName: "Recommended",
-        wallets: [injectedWallet, rabbyWallet, safeAppWallet, ...wcWallets],
+        wallets,
       },
     ],
     {
@@ -206,6 +218,9 @@ export function buildWagmiConfig(args: {
     ssr: true,
     chains: knownChains,
     connectors,
+    // Same reason as the framed wallet list: EIP-6963 connectors would be
+    // appended and walked by reconnect() before the Safe shows as connected.
+    multiInjectedProviderDiscovery: !framed,
     transports: {
       [mainnet.id]: transportFor(mainnet.id),
       [arbitrum.id]: transportFor(arbitrum.id),
