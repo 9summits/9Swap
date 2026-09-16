@@ -1,0 +1,5 @@
+{
+  "name": "swap",
+  "description": "Best-quote DEX aggregator swap across EVM chains. Approve and swap land as one Safe transaction.",
+  "iconPath": "favicon.svg"
+}
